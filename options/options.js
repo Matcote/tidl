@@ -1,15 +1,15 @@
 // Tidal ID — Options Page
-// Handles credential storage and OAuth 2.1 + PKCE flow
 
 const TIDAL_AUTH_URL = 'https://login.tidal.com/authorize';
 const TIDAL_TOKEN_URL = 'https://auth.tidal.com/v1/oauth2/token';
 const SCOPES = 'r_usr w_usr';
 
+// Must match the values in background.js
+const CLIENT_ID = 'YOUR_CLIENT_ID';
+const CLIENT_SECRET = 'YOUR_CLIENT_SECRET';
+
 const connectBtn = document.getElementById('connect-btn');
 const disconnectBtn = document.getElementById('disconnect');
-const saveCredsBtn = document.getElementById('save-credentials');
-const clientIdInput = document.getElementById('client-id');
-const clientSecretInput = document.getElementById('client-secret');
 const statusConnected = document.getElementById('status-connected');
 const statusDisconnected = document.getElementById('status-disconnected');
 const usernameEl = document.getElementById('username');
@@ -18,48 +18,21 @@ const messageEl = document.getElementById('message');
 // ─── Init ─────────────────────────────────────────────────────────────────────
 
 async function init() {
-  const stored = await chrome.storage.local.get(['clientId', 'clientSecret', 'accessToken', 'tidalUsername']);
-
-  if (stored.clientId) clientIdInput.value = stored.clientId;
-  if (stored.clientSecret) clientSecretInput.value = '••••••••';
-
-  if (stored.accessToken) {
-    showConnected(stored.tidalUsername || 'Tidal User');
-  }
+  const { accessToken, tidalUsername } = await chrome.storage.local.get(['accessToken', 'tidalUsername']);
+  if (accessToken) showConnected(tidalUsername || 'Tidal User');
 }
-
-// ─── Save Credentials ────────────────────────────────────────────────────────
-
-saveCredsBtn.addEventListener('click', async () => {
-  const clientId = clientIdInput.value.trim();
-  const clientSecret = clientSecretInput.value.trim();
-  if (!clientId || !clientSecret || clientSecret === '••••••••') {
-    showMessage('Enter valid Client ID and Client Secret.', true);
-    return;
-  }
-  await chrome.runtime.sendMessage({ type: 'STORE_CLIENT', clientId, clientSecret });
-  showMessage('Credentials saved.');
-});
 
 // ─── OAuth Connect ───────────────────────────────────────────────────────────
 
 connectBtn.addEventListener('click', async () => {
-  const { clientId } = await chrome.storage.local.get('clientId');
-  if (!clientId) {
-    showMessage('Save your Client ID and Secret first.', true);
-    return;
-  }
-
-  // Generate PKCE code verifier + challenge
   const codeVerifier = generateCodeVerifier();
   const codeChallenge = await generateCodeChallenge(codeVerifier);
   const state = crypto.randomUUID();
-
   const redirectUri = `https://${chrome.runtime.id}.chromiumapp.org/`;
 
   const authParams = new URLSearchParams({
     response_type: 'code',
-    client_id: clientId,
+    client_id: CLIENT_ID,
     redirect_uri: redirectUri,
     scope: SCOPES,
     code_challenge: codeChallenge,
@@ -67,32 +40,25 @@ connectBtn.addEventListener('click', async () => {
     state,
   });
 
-  const authUrl = `${TIDAL_AUTH_URL}?${authParams}`;
-
   let redirectUrl;
   try {
     redirectUrl = await chrome.identity.launchWebAuthFlow({
-      url: authUrl,
+      url: `${TIDAL_AUTH_URL}?${authParams}`,
       interactive: true,
     });
-  } catch (err) {
+  } catch {
     showMessage('Authorization cancelled or failed.', true);
     return;
   }
 
   const url = new URL(redirectUrl);
   const code = url.searchParams.get('code');
-  const returnedState = url.searchParams.get('state');
-
-  if (!code || returnedState !== state) {
+  if (!code || url.searchParams.get('state') !== state) {
     showMessage('Invalid response from Tidal.', true);
     return;
   }
 
-  // Exchange code for tokens
-  const { clientSecret } = await chrome.storage.local.get('clientSecret');
-  const creds = btoa(`${clientId}:${clientSecret}`);
-
+  const creds = btoa(`${CLIENT_ID}:${CLIENT_SECRET}`);
   const res = await fetch(TIDAL_TOKEN_URL, {
     method: 'POST',
     headers: {
@@ -108,14 +74,14 @@ connectBtn.addEventListener('click', async () => {
   });
 
   if (!res.ok) {
-    showMessage('Failed to exchange code for tokens.', true);
+    showMessage('Failed to connect to Tidal.', true);
     return;
   }
 
   const data = await res.json();
   await chrome.runtime.sendMessage({ type: 'STORE_TOKENS', data });
 
-  // Fetch user profile for display name + country code
+  // Fetch profile for display name + country code
   const profileRes = await fetch('https://openapi.tidal.com/v2/users/me', {
     headers: {
       'Authorization': `Bearer ${data.access_token}`,
@@ -172,8 +138,7 @@ function generateCodeVerifier() {
 }
 
 async function generateCodeChallenge(verifier) {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(verifier);
+  const data = new TextEncoder().encode(verifier);
   const digest = await crypto.subtle.digest('SHA-256', data);
   return btoa(String.fromCharCode(...new Uint8Array(digest)))
     .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');

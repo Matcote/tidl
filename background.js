@@ -6,6 +6,10 @@ const TIDAL_TOKEN_URL = 'https://auth.tidal.com/v1/oauth2/token';
 const TIDAL_API_BASE = 'https://openapi.tidal.com/v2';
 const SCOPES = 'r_usr w_usr';
 
+// Replace these with your credentials from developer.tidal.com
+const CLIENT_ID = 'bHtYwT1yMQcCJLbP';
+const CLIENT_SECRET = 'ze5A8pWj4iF0MIXK954OreG5CLpmfClsuhUOw77trR8=';
+
 // ─── Context Menu Setup ──────────────────────────────────────────────────────
 
 chrome.runtime.onInstalled.addListener(() => {
@@ -135,8 +139,7 @@ async function getValidToken() {
 async function refreshAccessToken(refreshToken) {
   if (!refreshToken) return null;
 
-  const { clientId, clientSecret } = await chrome.storage.local.get(['clientId', 'clientSecret']);
-  const creds = btoa(`${clientId}:${clientSecret}`);
+  const creds = btoa(`${CLIENT_ID}:${CLIENT_SECRET}`);
 
   const res = await fetch(TIDAL_TOKEN_URL, {
     method: 'POST',
@@ -168,13 +171,6 @@ async function storeTokens(data) {
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.type === 'STORE_TOKENS') {
     storeTokens(msg.data).then(() => sendResponse({ ok: true }));
-    return true;
-  }
-  if (msg.type === 'STORE_CLIENT') {
-    chrome.storage.local.set({
-      clientId: msg.clientId,
-      clientSecret: msg.clientSecret,
-    }).then(() => sendResponse({ ok: true }));
     return true;
   }
 });
