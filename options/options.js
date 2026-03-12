@@ -2,11 +2,11 @@
 
 const TIDAL_AUTH_URL = 'https://login.tidal.com/authorize';
 const TIDAL_TOKEN_URL = 'https://auth.tidal.com/v1/oauth2/token';
-const SCOPES = 'r_usr w_usr';
+const SCOPES = 'collection.read collection.write playlists.read playlists.write user.read search.read';
 
 // Must match the values in background.js
-const CLIENT_ID = 'YOUR_CLIENT_ID';
-const CLIENT_SECRET = 'YOUR_CLIENT_SECRET';
+const CLIENT_ID = 'HutZLClIEk6xcdjR';
+const CLIENT_SECRET = 'a5wvhdWaf3XmbYWUTMazqWArXuwugoYVHQcgKpwRpr4=';
 
 const connectBtn = document.getElementById('connect-btn');
 const disconnectBtn = document.getElementById('disconnect');
@@ -40,14 +40,19 @@ connectBtn.addEventListener('click', async () => {
     state,
   });
 
+  const fullAuthUrl = `${TIDAL_AUTH_URL}?${authParams}`;
+  console.log('[TidalID] Auth URL:', fullAuthUrl);
+  console.log('[TidalID] Redirect URI:', redirectUri);
+
   let redirectUrl;
   try {
     redirectUrl = await chrome.identity.launchWebAuthFlow({
-      url: `${TIDAL_AUTH_URL}?${authParams}`,
+      url: fullAuthUrl,
       interactive: true,
     });
-  } catch {
-    showMessage('Authorization cancelled or failed.', true);
+  } catch (err) {
+    console.error('[TidalID] launchWebAuthFlow error:', err);
+    showMessage(`Auth failed: ${err?.message || err}`, true);
     return;
   }
 
@@ -81,20 +86,22 @@ connectBtn.addEventListener('click', async () => {
   const data = await res.json();
   await chrome.runtime.sendMessage({ type: 'STORE_TOKENS', data });
 
-  // Fetch profile for display name + country code
-  const profileRes = await fetch('https://openapi.tidal.com/v2/users/me', {
-    headers: {
-      'Authorization': `Bearer ${data.access_token}`,
-      'Accept': 'application/vnd.tidal.v1+json',
-    },
-  });
+  const userId = data.user_id;
+  await chrome.storage.local.set({ userId });
 
-  let username = 'Tidal User';
+  // Decode JWT to extract user info without an extra API call
+  let username = `User ${userId}`;
   let countryCode = 'US';
-  if (profileRes.ok) {
-    const profile = await profileRes.json();
-    username = profile.data?.attributes?.username || username;
-    countryCode = profile.data?.attributes?.countryCode || countryCode;
+
+  try {
+    const b64 = data.access_token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    const payload = JSON.parse(atob(b64.padEnd(b64.length + (4 - b64.length % 4) % 4, '=')));
+    console.log('[TidalID] Token payload:', JSON.stringify(payload));
+    const fullName = [payload.firstName, payload.lastName].filter(Boolean).join(' ');
+    username = payload.username || payload.usr || fullName || payload.email || username;
+    countryCode = payload.cc || countryCode;
+  } catch (e) {
+    console.warn('[TidalID] JWT decode failed:', e);
   }
 
   await chrome.storage.local.set({ tidalUsername: username, countryCode });

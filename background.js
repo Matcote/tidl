@@ -4,7 +4,7 @@
 const TIDAL_AUTH_URL = 'https://login.tidal.com/authorize';
 const TIDAL_TOKEN_URL = 'https://auth.tidal.com/v1/oauth2/token';
 const TIDAL_API_BASE = 'https://openapi.tidal.com/v2';
-const SCOPES = 'r_usr w_usr';
+const SCOPES = 'collection.read collection.write playlists.read playlists.write user.read search.read';
 
 // Replace these with your credentials from developer.tidal.com
 const CLIENT_ID = 'HutZLClIEk6xcdjR';
@@ -62,37 +62,38 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 // ─── Tidal API Calls ─────────────────────────────────────────────────────────
 
 async function handleSearch(query) {
-  const { countryCode = 'US' } = await chrome.storage.local.get('countryCode');
+  const { countryCode = 'CA' } = await chrome.storage.local.get('countryCode');
   const encoded = encodeURIComponent(query);
-  const url = `${TIDAL_API_BASE}/searchresults/${encoded}?countryCode=${countryCode}&include=tracks,tracks.artists`;
-  return tidalFetch(url);
+  const url = `${TIDAL_API_BASE}/searchResults/${encoded}?countryCode=${countryCode}&include=tracks,tracks.artists,tracks.albums,tracks.albums.coverArt`;
+  const result = await tidalFetch(url);
+  console.log('[TidalID] Search result:', JSON.stringify(result).slice(0, 500));
+  return result;
 }
 
 async function handleGetPlaylists() {
-  const url = `${TIDAL_API_BASE}/users/me/playlists`;
+  const { userId, countryCode = 'CA' } = await chrome.storage.local.get(['userId', 'countryCode']);
+  const url = `${TIDAL_API_BASE}/userCollections/${userId}/relationships/playlists?countryCode=${countryCode}`;
   return tidalFetch(url);
 }
 
 async function handleAddFavorite(trackId) {
-  const { countryCode = 'US' } = await chrome.storage.local.get('countryCode');
-  const url = `${TIDAL_API_BASE}/users/me/favorites/tracks`;
+  const { userId, countryCode = 'CA' } = await chrome.storage.local.get(['userId', 'countryCode']);
+  const url = `${TIDAL_API_BASE}/userCollections/${userId}/relationships/tracks?countryCode=${countryCode}`;
   return tidalFetch(url, {
     method: 'POST',
     body: JSON.stringify({
-      data: [{ type: 'tracks', id: String(trackId) }],
-      meta: { countryCode },
+      data: [{ id: String(trackId), type: 'tracks' }],
     }),
   });
 }
 
 async function handleAddToPlaylist(trackId, playlistId) {
-  const { countryCode = 'US' } = await chrome.storage.local.get('countryCode');
-  const url = `${TIDAL_API_BASE}/playlists/${playlistId}/relationships/items`;
+  const { countryCode = 'CA' } = await chrome.storage.local.get('countryCode');
+  const url = `${TIDAL_API_BASE}/playlists/${playlistId}/relationships/items?countryCode=${countryCode}`;
   return tidalFetch(url, {
     method: 'POST',
     body: JSON.stringify({
-      data: [{ type: 'tracks', id: String(trackId) }],
-      meta: { countryCode },
+      data: [{ id: String(trackId), type: 'tracks' }],
     }),
   });
 }
@@ -107,8 +108,8 @@ async function tidalFetch(url, options = {}) {
     ...options,
     headers: {
       'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/vnd.tidal.v1+json',
-      'Accept': 'application/vnd.tidal.v1+json',
+      'Content-Type': 'application/vnd.api+json',
+      'Accept': 'application/vnd.api+json',
       ...(options.headers || {}),
     },
   });
@@ -160,11 +161,13 @@ async function refreshAccessToken(refreshToken) {
 }
 
 async function storeTokens(data) {
-  await chrome.storage.local.set({
+  const update = {
     accessToken: data.access_token,
     refreshToken: data.refresh_token ?? (await chrome.storage.local.get('refreshToken')).refreshToken,
     expiresAt: Date.now() + data.expires_in * 1000,
-  });
+  };
+  if (data.user_id) update.userId = data.user_id;
+  await chrome.storage.local.set(update);
 }
 
 // Exposed for options page to call after OAuth exchange

@@ -52,10 +52,12 @@ async function init() {
 // ─── Data Extraction ──────────────────────────────────────────────────────────
 
 function extractTracks(data) {
-  // The searchresults endpoint returns tracks under data[0].relationships.tracks
-  // and included resources contain track details
   const included = data?.included || [];
-  const tracks = included.filter(r => r.type === 'tracks');
+  const searchResult = Array.isArray(data?.data) ? data.data[0] : data?.data;
+  const orderedIds = searchResult?.relationships?.tracks?.data?.map(t => t.id) || [];
+  const tracks = orderedIds.length
+    ? orderedIds.map(id => included.find(r => r.type === 'tracks' && r.id === id)).filter(Boolean)
+    : included.filter(r => r.type === 'tracks');
 
   return tracks.map(track => {
     const attrs = track.attributes || {};
@@ -70,7 +72,13 @@ function extractTracks(data) {
     const albumResource = albumRel
       ? included.find(r => r.type === 'albums' && r.id === albumRel.id)
       : null;
-    const artUrl = albumResource?.attributes?.imageLinks?.[0]?.href || null;
+    const coverArtId = albumResource?.relationships?.coverArt?.data?.[0]?.id;
+    const artworkResource = coverArtId
+      ? included.find(r => r.type === 'artworks' && r.id === coverArtId)
+      : null;
+    const artUrl = artworkResource?.attributes?.files?.find(f => f.meta?.width === 160)?.href
+      || artworkResource?.attributes?.files?.[0]?.href
+      || null;
 
     return {
       id: track.id,
@@ -82,10 +90,13 @@ function extractTracks(data) {
   });
 }
 
-function formatDuration(seconds) {
-  if (!seconds) return '';
-  const m = Math.floor(seconds / 60);
-  const s = String(seconds % 60).padStart(2, '0');
+function formatDuration(iso) {
+  if (!iso) return '';
+  const match = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+  if (!match) return '';
+  const h = parseInt(match[1] || '0');
+  const m = parseInt(match[2] || '0') + h * 60;
+  const s = String(parseInt(match[3] || '0')).padStart(2, '0');
   return `${m}:${s}`;
 }
 
