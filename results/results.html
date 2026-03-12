@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Tidal ID — Search Results</title>
+  <link rel="stylesheet" href="results.css" />
+</head>
+<body>
+  <header>
+    <span class="logo">Tidal ID</span>
+    <span id="query-label" class="query"></span>
+  </header>
+
+  <div id="state-loading" class="state">
+    <div class="spinner"></div>
+    <p>Searching Tidal…</p>
+  </div>
+
+  <div id="state-empty" class="state hidden">
+    <p>No tracks found.</p>
+  </div>
+
+  <div id="state-error" class="state hidden">
+    <p id="error-message">Something went wrong.</p>
+  </div>
+
+  <ul id="results-list" class="hidden"></ul>
+
+  <!-- Playlist picker dropdown (shared, repositioned on use) -->
+  <div id="playlist-picker" class="hidden">
+    <div class="picker-header">Add to playlist</div>
+    <ul id="playlist-list"></ul>
+  </div>
+
+  <script src="results.js"></script>
+</body>
+</html>

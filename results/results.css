@@ -1,0 +1,187 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #0a0a0a;
+  color: #e8e8e8;
+  width: 500px;
+  overflow-x: hidden;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid #1f1f1f;
+  position: sticky;
+  top: 0;
+  background: #0a0a0a;
+  z-index: 10;
+}
+
+.logo {
+  font-weight: 700;
+  font-size: 15px;
+  color: #00FFFF;
+  flex-shrink: 0;
+}
+
+.query {
+  font-size: 13px;
+  color: #666;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.query::before { content: '→ '; }
+
+/* ─── States ─────────────────────────────────────── */
+
+.state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 60px 16px;
+  color: #555;
+  font-size: 14px;
+}
+
+.spinner {
+  width: 28px;
+  height: 28px;
+  border: 2px solid #222;
+  border-top-color: #00FFFF;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ─── Track List ─────────────────────────────────── */
+
+#results-list {
+  list-style: none;
+  padding: 8px 0;
+  max-height: calc(100vh - 56px);
+  overflow-y: auto;
+}
+
+.track-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid #141414;
+  transition: background 0.1s;
+}
+
+.track-item:hover { background: #111; }
+
+.track-art {
+  width: 44px;
+  height: 44px;
+  border-radius: 6px;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: #1a1a1a;
+}
+
+.track-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.track-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.track-artist {
+  font-size: 12px;
+  color: #777;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.track-duration {
+  font-size: 11px;
+  color: #555;
+  flex-shrink: 0;
+}
+
+/* ─── Action Buttons ─────────────────────────────── */
+
+.track-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.btn-fav, .btn-playlist {
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid #2a2a2a;
+  background: transparent;
+  color: #aaa;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.btn-fav:hover { border-color: #00FFFF; color: #00FFFF; }
+.btn-playlist:hover { border-color: #a78bfa; color: #a78bfa; }
+
+.btn-fav.added { border-color: #22c55e; color: #22c55e; cursor: default; }
+.btn-playlist.added { border-color: #22c55e; color: #22c55e; cursor: default; }
+
+/* ─── Playlist Picker ────────────────────────────── */
+
+#playlist-picker {
+  position: fixed;
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  border-radius: 10px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+  min-width: 220px;
+  max-height: 260px;
+  overflow-y: auto;
+  z-index: 100;
+}
+
+.picker-header {
+  font-size: 11px;
+  font-weight: 600;
+  color: #555;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 10px 14px 6px;
+}
+
+#playlist-list {
+  list-style: none;
+  padding: 4px 0 8px;
+}
+
+#playlist-list li {
+  padding: 8px 14px;
+  font-size: 13px;
+  color: #ccc;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+#playlist-list li:hover { background: #222; color: #fff; }
+
+.hidden { display: none !important; }

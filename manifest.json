@@ -1,0 +1,31 @@
+{
+  "manifest_version": 3,
+  "name": "Tidal ID",
+  "version": "0.1.0",
+  "description": "Highlight text, search Tidal, add tracks to your favorites or playlists.",
+  "permissions": ["contextMenus", "storage", "identity"],
+  "host_permissions": [
+    "https://openapi.tidal.com/*",
+    "https://auth.tidal.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "options_ui": {
+    "page": "options/options.html",
+    "open_in_tab": true
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_title": "Tidal ID",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  }
+}

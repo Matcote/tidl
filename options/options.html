@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Tidal ID — Settings</title>
+  <link rel="stylesheet" href="options.css" />
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Tidal ID</h1>
+      <p class="subtitle">Connect your Tidal account to start identifying music.</p>
+    </header>
+
+    <section class="card" id="credentials-section">
+      <h2>App Credentials</h2>
+      <p>Enter your Tidal API credentials from the <a href="https://developer.tidal.com" target="_blank">Tidal Developer Portal</a>.</p>
+      <label>
+        Client ID
+        <input type="text" id="client-id" placeholder="your_client_id" autocomplete="off" />
+      </label>
+      <label>
+        Client Secret
+        <input type="password" id="client-secret" placeholder="your_client_secret" autocomplete="off" />
+      </label>
+      <button id="save-credentials">Save Credentials</button>
+    </section>
+
+    <section class="card">
+      <h2>Tidal Account</h2>
+      <div id="status-connected" class="status hidden">
+        <span class="dot connected"></span>
+        Connected as <strong id="username"></strong>
+        <button id="disconnect" class="secondary">Disconnect</button>
+      </div>
+      <div id="status-disconnected" class="status">
+        <span class="dot disconnected"></span>
+        Not connected
+      </div>
+      <button id="connect-btn" class="primary">Connect to Tidal</button>
+    </section>
+
+    <p class="message hidden" id="message"></p>
+  </div>
+  <script src="options.js"></script>
+</body>
+</html>
