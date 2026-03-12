@@ -7,8 +7,8 @@ const TIDAL_API_BASE = 'https://openapi.tidal.com/v2';
 const SCOPES = 'r_usr w_usr';
 
 // Replace these with your credentials from developer.tidal.com
-const CLIENT_ID = 'bHtYwT1yMQcCJLbP';
-const CLIENT_SECRET = 'ze5A8pWj4iF0MIXK954OreG5CLpmfClsuhUOw77trR8=';
+const CLIENT_ID = 'HutZLClIEk6xcdjR';
+const CLIENT_SECRET = 'a5wvhdWaf3XmbYWUTMazqWArXuwugoYVHQcgKpwRpr4=';
 
 // ─── Context Menu Setup ──────────────────────────────────────────────────────
 
