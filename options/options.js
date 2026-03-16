@@ -14,13 +14,19 @@ const statusConnected = document.getElementById('status-connected');
 const statusDisconnected = document.getElementById('status-disconnected');
 const usernameEl = document.getElementById('username');
 const messageEl = document.getElementById('message');
+const selectionPopupToggle = document.getElementById('selection-popup-toggle');
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 
 async function init() {
-  const { accessToken, tidalUsername } = await chrome.storage.local.get(['accessToken', 'tidalUsername']);
+  const { accessToken, tidalUsername, selectionPopup = true } = await chrome.storage.local.get(['accessToken', 'tidalUsername', 'selectionPopup']);
   if (accessToken) showConnected(tidalUsername || 'Tidal User');
+  selectionPopupToggle.checked = selectionPopup;
 }
+
+selectionPopupToggle.addEventListener('change', () => {
+  chrome.storage.local.set({ selectionPopup: selectionPopupToggle.checked });
+});
 
 // ─── OAuth Connect ───────────────────────────────────────────────────────────
 

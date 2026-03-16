@@ -8,6 +8,13 @@
     "https://openapi.tidal.com/*",
     "https://auth.tidal.com/*"
   ],
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "css": ["content.css"]
+    }
+  ],
   "background": {
     "service_worker": "background.js"
   },

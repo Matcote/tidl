@@ -63,10 +63,11 @@ function extractTracks(data) {
     const attrs = track.attributes || {};
     const artistRel = track.relationships?.artists?.data || [];
 
-    const artistNames = artistRel.map(a => {
+    const artists = artistRel.map(a => {
       const artistResource = included.find(r => r.type === 'artists' && r.id === a.id);
-      return artistResource?.attributes?.name || '';
-    }).filter(Boolean).join(', ');
+      const name = artistResource?.attributes?.name || '';
+      return name ? { id: a.id, name } : null;
+    }).filter(Boolean);
 
     const albumRel = track.relationships?.albums?.data?.[0];
     const albumResource = albumRel
@@ -83,7 +84,7 @@ function extractTracks(data) {
     return {
       id: track.id,
       title: attrs.title || 'Unknown Track',
-      artist: artistNames || 'Unknown Artist',
+      artists,
       duration: formatDuration(attrs.duration),
       artUrl,
     };
@@ -120,9 +121,16 @@ function renderTracks(tracks) {
 
     const info = document.createElement('div');
     info.className = 'track-info';
+
+    const artistHtml = track.artists.length
+      ? track.artists.map(a =>
+          `<a class="track-link" href="#" data-app-url="tidal://artist/${a.id}" data-web-url="https://tidal.com/artist/${a.id}">${escapeHtml(a.name)}</a>`
+        ).join(', ')
+      : 'Unknown Artist';
+
     info.innerHTML = `
-      <div class="track-title">${escapeHtml(track.title)}</div>
-      <div class="track-artist">${escapeHtml(track.artist)}</div>
+      <div class="track-title"><a class="track-link" href="#" data-app-url="tidal://track/${track.id}" data-web-url="https://tidal.com/track/${track.id}">${escapeHtml(track.title)}</a></div>
+      <div class="track-artist">${artistHtml}</div>
     `;
 
     const duration = document.createElement('span');
@@ -148,6 +156,29 @@ function renderTracks(tracks) {
   }
 
   showState(resultsList);
+}
+
+// ─── Tidal Link Handler ───────────────────────────────────────────────────────
+
+// Try to open the Tidal desktop app; fall back to the web URL if app isn't installed.
+// Detection: if the app opens, the popup window loses focus (blur). If no blur fires
+// within ~600ms, the app isn't installed and we open the web URL instead.
+resultsList.addEventListener('click', (e) => {
+  const link = e.target.closest('.track-link');
+  if (!link) return;
+  e.preventDefault();
+  openTidalLink(link.dataset.appUrl, link.dataset.webUrl);
+});
+
+function openTidalLink(appUrl, webUrl) {
+  const timer = setTimeout(() => window.open(webUrl, '_blank'), 600);
+  window.addEventListener('blur', () => clearTimeout(timer), { once: true });
+
+  const a = document.createElement('a');
+  a.href = appUrl;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
 }
 
 // ─── Actions ──────────────────────────────────────────────────────────────────

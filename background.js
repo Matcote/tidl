@@ -44,6 +44,9 @@ chrome.contextMenus.onClicked.addListener(async (info) => {
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   switch (msg.type) {
+    case 'OPEN_RESULTS':
+      openResults(msg.query);
+      return false;
     case 'SEARCH':
       handleSearch(msg.query).then(sendResponse);
       return true;
@@ -58,6 +61,21 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       return true;
   }
 });
+
+async function openResults(query) {
+  const token = await getValidToken();
+  if (!token) {
+    chrome.runtime.openOptionsPage();
+    return;
+  }
+  await chrome.storage.session.set({ tidalIdQuery: query.trim() });
+  chrome.windows.create({
+    url: chrome.runtime.getURL('results/results.html'),
+    type: 'popup',
+    width: 500,
+    height: 620,
+  });
+}
 
 // ─── Tidal API Calls ─────────────────────────────────────────────────────────
 
