@@ -93,10 +93,12 @@ async function handleSearch(query: string): Promise<SearchResponse> {
 }
 
 async function handleGetPlaylists(): Promise<PlaylistsResponse> {
-  const stored = await chrome.storage.local.get(['userId', 'countryCode']) as { userId?: string; countryCode?: string };
+  const stored = await chrome.storage.local.get('countryCode') as { countryCode?: string };
   const countryCode = stored.countryCode ?? 'CA';
-  const url = `${TIDAL_API_BASE}/userCollections/${stored.userId}/relationships/playlists?countryCode=${countryCode}`;
-  return tidalFetch(url) as Promise<PlaylistsResponse>;
+  const url = `${TIDAL_API_BASE}/playlists?filter[owners.id]=me&countryCode=${countryCode}`;
+  const result = await tidalFetch(url) as PlaylistsResponse;
+  console.log('[TidalID] Playlists result:', JSON.stringify(result).slice(0, 500));
+  return result;
 }
 
 async function handleAddFavorite(trackId: string): Promise<MutationResponse> {

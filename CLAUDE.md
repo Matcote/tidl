@@ -62,9 +62,11 @@ Background stores transient search queries in `chrome.storage.session` key `tida
 | `selectionPopup` | Whether popup appears on text selection |
 
 ### Tidal API
-Uses `https://openapi.tidal.com/v2/` (JSON:API format). Key endpoints:
+Uses `https://openapi.tidal.com/v2/` (JSON:API format). Full reference: https://tidal-music.github.io/tidal-api-reference/
+
+Key endpoints:
 - `searchResults/{query}` — track search
-- `userCollections/{userId}/relationships/playlists` — list playlists
+- `playlists?filter[owners.id]=me` — list playlists owned by the authenticated user (returns full resources with `attributes.name`)
 - `userCollections/{userId}/relationships/tracks` — add to favorites
 - `playlists/{playlistId}/relationships/items` — add to playlist
 

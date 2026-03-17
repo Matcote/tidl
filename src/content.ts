@@ -254,7 +254,7 @@ async function doSearch(query: string): Promise<void> {
   if (playlistResult.data) {
     panelPlaylists = playlistResult.data.map(p => ({
       id: p.id,
-      name: (p.attributes?.['title'] as string | undefined) ?? 'Untitled Playlist',
+      name: (p.attributes?.['name'] as string | undefined) ?? 'Untitled Playlist',
     }));
   }
 
