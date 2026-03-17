@@ -114,7 +114,10 @@ document.addEventListener('mouseup', (e) => {
       placement === 'above'
         ? rect.top + window.scrollY - btnEstimatedHeight - 8
         : rect.bottom + window.scrollY + 8;
-    const y = Math.max(window.scrollY + 8, yRaw);
+    const y = Math.max(
+      window.scrollY + 8,
+      Math.min(yRaw, window.scrollY + window.innerHeight - btnEstimatedHeight - 8),
+    );
 
     tidalPopupBtn.style.left = `${x}px`;
     tidalPopupBtn.style.top = `${y}px`;
@@ -182,7 +185,8 @@ function openSearchPanel(
     tidalPanel.style.transform = 'translateY(-100%)';
     tidalPanel.classList.add('tidp-above');
   } else {
-    tidalPanel.style.top = `${btnTop}px`;
+    const maxTop = window.scrollY + window.innerHeight - PANEL_HEIGHT - 8;
+    tidalPanel.style.top = `${Math.min(btnTop, maxTop)}px`;
   }
 
   tidalPanel.innerHTML = `
