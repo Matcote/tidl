@@ -82,7 +82,17 @@ header {
   padding: 8px 0;
   max-height: calc(100vh - 56px);
   overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #2a2a2a transparent;
 }
+
+#results-list::-webkit-scrollbar { width: 6px; }
+#results-list::-webkit-scrollbar-track { background: transparent; }
+#results-list::-webkit-scrollbar-thumb {
+  background: #2a2a2a;
+  border-radius: 3px;
+}
+#results-list::-webkit-scrollbar-thumb:hover { background: #3a3a3a; }
 
 .track-item {
   display: flex;

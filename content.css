@@ -149,10 +149,20 @@
   overflow-y: auto;
   max-height: 496px; /* 540 - 44 header */
   overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #2a2a2a transparent;
 
   opacity: 0;
   transition: opacity 0.15s 0.32s;
 }
+
+.tidp-body::-webkit-scrollbar { width: 6px; }
+.tidp-body::-webkit-scrollbar-track { background: transparent; }
+.tidp-body::-webkit-scrollbar-thumb {
+  background: #2a2a2a;
+  border-radius: 3px;
+}
+.tidp-body::-webkit-scrollbar-thumb:hover { background: #3a3a3a; }
 
 #tidal-id-panel.tidp-open .tidp-body {
   opacity: 1;
