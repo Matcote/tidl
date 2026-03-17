@@ -82,7 +82,7 @@ async function openResults(query: string): Promise<void> {
 
 // ─── Tidal API Calls ─────────────────────────────────────────────────────────
 
-async function handleSearch(query: string): Promise<SearchResponse> {
+export async function handleSearch(query: string): Promise<SearchResponse> {
   const stored = await chrome.storage.local.get('countryCode') as { countryCode?: string };
   const countryCode = stored.countryCode ?? 'CA';
   const encoded = encodeURIComponent(query);
@@ -92,7 +92,7 @@ async function handleSearch(query: string): Promise<SearchResponse> {
   return result as SearchResponse;
 }
 
-async function handleGetPlaylists(): Promise<PlaylistsResponse> {
+export async function handleGetPlaylists(): Promise<PlaylistsResponse> {
   const stored = await chrome.storage.local.get('countryCode') as { countryCode?: string };
   const countryCode = stored.countryCode ?? 'CA';
   const url = `${TIDAL_API_BASE}/playlists?filter[owners.id]=me&countryCode=${countryCode}`;
@@ -101,7 +101,7 @@ async function handleGetPlaylists(): Promise<PlaylistsResponse> {
   return result;
 }
 
-async function handleAddFavorite(trackId: string): Promise<MutationResponse> {
+export async function handleAddFavorite(trackId: string): Promise<MutationResponse> {
   const stored = await chrome.storage.local.get(['userId', 'countryCode']) as { userId?: string; countryCode?: string };
   const countryCode = stored.countryCode ?? 'CA';
   const url = `${TIDAL_API_BASE}/userCollections/${stored.userId}/relationships/tracks?countryCode=${countryCode}`;
@@ -111,7 +111,7 @@ async function handleAddFavorite(trackId: string): Promise<MutationResponse> {
   }) as Promise<MutationResponse>;
 }
 
-async function handleAddToPlaylist(trackId: string, playlistId: string): Promise<MutationResponse> {
+export async function handleAddToPlaylist(trackId: string, playlistId: string): Promise<MutationResponse> {
   const stored = await chrome.storage.local.get('countryCode') as { countryCode?: string };
   const countryCode = stored.countryCode ?? 'CA';
   const url = `${TIDAL_API_BASE}/playlists/${playlistId}/relationships/items?countryCode=${countryCode}`;
@@ -123,7 +123,7 @@ async function handleAddToPlaylist(trackId: string, playlistId: string): Promise
 
 // ─── Authenticated Fetch ─────────────────────────────────────────────────────
 
-async function tidalFetch(
+export async function tidalFetch(
   url: string,
   options: RequestInit = {},
 ): Promise<SearchResponse | PlaylistsResponse | MutationResponse> {
@@ -151,7 +151,7 @@ async function tidalFetch(
 
 // ─── Token Management ────────────────────────────────────────────────────────
 
-async function getValidToken(): Promise<string | null> {
+export async function getValidToken(): Promise<string | null> {
   const stored = await chrome.storage.local.get(['accessToken', 'refreshToken', 'expiresAt']) as {
     accessToken?: string;
     refreshToken?: string;
@@ -167,7 +167,7 @@ async function getValidToken(): Promise<string | null> {
   return stored.accessToken;
 }
 
-async function refreshAccessToken(refreshToken: string | undefined): Promise<string | null> {
+export async function refreshAccessToken(refreshToken: string | undefined): Promise<string | null> {
   if (!refreshToken) return null;
 
   const creds = btoa(`${CLIENT_ID}:${CLIENT_SECRET}`);
@@ -190,7 +190,7 @@ async function refreshAccessToken(refreshToken: string | undefined): Promise<str
   return data.access_token;
 }
 
-async function storeTokens(data: OAuthTokenResponse): Promise<void> {
+export async function storeTokens(data: OAuthTokenResponse): Promise<void> {
   const stored = await chrome.storage.local.get('refreshToken') as { refreshToken?: string };
   const update: Record<string, unknown> = {
     accessToken: data.access_token,

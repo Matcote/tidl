@@ -9,7 +9,7 @@
     "exactOptionalPropertyTypes": true,
     "types": ["chrome"],
     "noEmit": true,
-    "skipLibCheck": false
+    "skipLibCheck": true
   },
   "include": ["src/**/*.ts"]
 }

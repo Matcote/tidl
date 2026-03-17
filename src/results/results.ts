@@ -128,7 +128,7 @@ resultsList.addEventListener('click', (e) => {
 
 // ─── Actions ──────────────────────────────────────────────────────────────────
 
-async function addFavorite(trackId: string, btn: HTMLButtonElement): Promise<void> {
+export async function addFavorite(trackId: string, btn: HTMLButtonElement): Promise<void> {
   if (btn.classList.contains('added')) return;
   btn.textContent = '…';
   btn.disabled = true;
@@ -144,7 +144,7 @@ async function addFavorite(trackId: string, btn: HTMLButtonElement): Promise<voi
   }
 }
 
-function togglePlaylistPicker(e: MouseEvent, trackId: string, btn: HTMLButtonElement): void {
+export function togglePlaylistPicker(e: MouseEvent, trackId: string, btn: HTMLButtonElement): void {
   e.stopPropagation();
 
   if (!playlists.length) {

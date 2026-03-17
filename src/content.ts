@@ -362,7 +362,7 @@ function renderTracks(tracks: Track[], listEl: HTMLUListElement): void {
 
 // ─── Actions ──────────────────────────────────────────────────────────────────
 
-async function addFavoriteInline(trackId: string, btn: HTMLButtonElement): Promise<void> {
+export async function addFavoriteInline(trackId: string, btn: HTMLButtonElement): Promise<void> {
   if (btn.classList.contains('added')) return;
   btn.textContent = '…';
   btn.disabled = true;
@@ -376,7 +376,7 @@ async function addFavoriteInline(trackId: string, btn: HTMLButtonElement): Promi
   }
 }
 
-function togglePlaylistPickerInline(
+export function togglePlaylistPickerInline(
   e: MouseEvent,
   trackId: string,
   btn: HTMLButtonElement,
