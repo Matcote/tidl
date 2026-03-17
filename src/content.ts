@@ -106,14 +106,15 @@ document.addEventListener('mouseup', (e) => {
       ),
     );
 
-    // Place above when text is in the bottom half of the viewport,
-    // or when there isn't enough room below for the full panel
+    // Prefer below; go above only if more space exists there
     const spaceBelow = window.innerHeight - rect.bottom;
-    const placement = spaceBelow < PANEL_HEIGHT ? 'above' : 'below';
-    const y =
+    const spaceAbove = rect.top;
+    const placement = spaceBelow >= PANEL_HEIGHT ? 'below' : spaceAbove > spaceBelow ? 'above' : 'below';
+    const yRaw =
       placement === 'above'
         ? rect.top + window.scrollY - btnEstimatedHeight - 8
         : rect.bottom + window.scrollY + 8;
+    const y = Math.max(window.scrollY + 8, yRaw);
 
     tidalPopupBtn.style.left = `${x}px`;
     tidalPopupBtn.style.top = `${y}px`;
@@ -174,7 +175,10 @@ function openSearchPanel(
     // translateY(-100%) shifts the panel up by its own rendered height, so as
     // max-height grows the panel expands upward — no dependency on scrollHeight
     // or the containing block's dimensions.
-    tidalPanel.style.top = `${btnTop + btnH}px`;
+    // Clamp the anchor so the panel's top edge never goes above the viewport.
+    const desiredAnchor = btnTop + btnH;
+    const minAnchor = window.scrollY + 8 + PANEL_HEIGHT;
+    tidalPanel.style.top = `${Math.max(desiredAnchor, minAnchor)}px`;
     tidalPanel.style.transform = 'translateY(-100%)';
     tidalPanel.classList.add('tidp-above');
   } else {

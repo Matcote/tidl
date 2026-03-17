@@ -243,7 +243,17 @@ async function doSearch(query) {
 
   if (searchResult?.error) {
     loading.classList.add('tidp-hidden');
-    errorEl.textContent = searchResult.error;
+    if (searchResult.error === 'Not authenticated') {
+      const msg = document.createElement('span');
+      msg.textContent = 'Not signed in to Tidal.';
+      const btn = document.createElement('button');
+      btn.className = 'tidp-btn-settings';
+      btn.textContent = 'Open Settings';
+      btn.addEventListener('click', () => chrome.runtime.sendMessage({ type: 'OPEN_OPTIONS' }));
+      errorEl.append(msg, btn);
+    } else {
+      errorEl.textContent = searchResult.error;
+    }
     errorEl.classList.remove('tidp-hidden');
     return;
   }

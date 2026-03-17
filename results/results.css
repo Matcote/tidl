@@ -50,6 +50,20 @@ header {
   font-size: 14px;
 }
 
+#settings-btn {
+  padding: 7px 18px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid #00FFFF;
+  color: #00FFFF;
+  background: transparent;
+  transition: background 0.15s;
+}
+
+#settings-btn:hover { background: rgba(0, 255, 255, 0.1); }
+
 .spinner {
   width: 28px;
   height: 28px;

@@ -4,10 +4,13 @@ const stateLoading = document.getElementById('state-loading');
 const stateEmpty = document.getElementById('state-empty');
 const stateError = document.getElementById('state-error');
 const errorMessage = document.getElementById('error-message');
+const settingsBtn = document.getElementById('settings-btn');
 const resultsList = document.getElementById('results-list');
 const queryLabel = document.getElementById('query-label');
 const playlistPicker = document.getElementById('playlist-picker');
 const playlistList = document.getElementById('playlist-list');
+
+settingsBtn.addEventListener('click', () => chrome.runtime.openOptionsPage());
 
 let playlists = [];
 let activeFavBtn = null; // track which playlist btn is open
@@ -268,6 +271,9 @@ function showState(el) {
 
 function showError(msg) {
   errorMessage.textContent = msg;
+  if (msg === 'Not authenticated') {
+    settingsBtn.classList.remove('hidden');
+  }
   showState(stateError);
 }
 

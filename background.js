@@ -59,6 +59,9 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     case 'ADD_TO_PLAYLIST':
       handleAddToPlaylist(msg.trackId, msg.playlistId).then(sendResponse);
       return true;
+    case 'OPEN_OPTIONS':
+      chrome.runtime.openOptionsPage();
+      return false;
   }
 });
 
