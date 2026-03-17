@@ -30,9 +30,35 @@ function removePanel() {
 
 // ─── Text Selection Popup ─────────────────────────────────────────────────────
 
+// Track whether the user is intentionally selecting text (drag, double-click,
+// or triple-click) vs. a plain single click that might leave a stale selection.
+let selectionIntent = false;
+let mousedownPos = null;
+
+document.addEventListener('mousedown', (e) => {
+  selectionIntent = false;
+  mousedownPos = { x: e.clientX, y: e.clientY };
+
+  // double-click / triple-click → intentional selection
+  if (e.detail >= 2) selectionIntent = true;
+
+  // Dismiss popup/panel when clicking outside them
+  if (tidalPopupBtn && !tidalPopupBtn.contains(e.target)) removePopup();
+  if (tidalPanel && !tidalPanel.contains(e.target)) removePanel();
+});
+
 document.addEventListener('mouseup', (e) => {
   if (tidalPopupBtn && tidalPopupBtn.contains(e.target)) return;
   if (tidalPanel && tidalPanel.contains(e.target)) return;
+
+  // Detect click-and-drag (moved more than 5 px)
+  if (mousedownPos) {
+    const dx = e.clientX - mousedownPos.x;
+    const dy = e.clientY - mousedownPos.y;
+    if (dx * dx + dy * dy > 25) selectionIntent = true;
+  }
+
+  if (!selectionIntent) return;
 
   setTimeout(async () => {
     let selectionPopup = true;
@@ -102,11 +128,6 @@ document.addEventListener('mouseup', (e) => {
   }, 20);
 });
 
-document.addEventListener('mousedown', (e) => {
-  if (tidalPopupBtn && !tidalPopupBtn.contains(e.target)) removePopup();
-  if (tidalPanel && !tidalPanel.contains(e.target)) removePanel();
-});
-
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') { removePopup(); removePanel(); }
 });
@@ -132,9 +153,12 @@ function openSearchPanel(query, btnLeft, btnTop, btnW, btnH, placement = 'below'
   tidalPanel.style.setProperty('--btn-h', `${Math.round(btnH)}px`);
 
   if (placement === 'above') {
-    // Anchor bottom edge to button's bottom so panel grows upward
-    const docHeight = document.documentElement.scrollHeight;
-    tidalPanel.style.bottom = `${docHeight - (btnTop + btnH)}px`;
+    // Anchor so the panel's bottom edge stays at the button's bottom edge.
+    // translateY(-100%) shifts the panel up by its own rendered height, so as
+    // max-height grows the panel expands upward — no dependency on scrollHeight
+    // or the containing block's dimensions.
+    tidalPanel.style.top = `${btnTop + btnH}px`;
+    tidalPanel.style.transform = 'translateY(-100%)';
     tidalPanel.classList.add('tidp-above');
   } else {
     tidalPanel.style.top = `${btnTop}px`;
