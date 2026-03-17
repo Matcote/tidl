@@ -8,21 +8,27 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Development
 
-This is a vanilla JavaScript extension with **no build step**. Load it directly in Chrome:
+TypeScript sources live in `src/`. Build to `dist/` before loading in Chrome:
+
+```
+npm run build      # compile once
+npm run watch      # compile on file changes
+npm run typecheck  # type-check only (no output)
+```
+
+Load the extension from `dist/` (not the project root):
 
 1. Go to `chrome://extensions`
 2. Enable "Developer mode"
-3. Click "Load unpacked" → select the project directory
+3. Click "Load unpacked" → select the `dist/` directory
 
-After editing files, click the reload button on the extension card in `chrome://extensions` to apply changes. Content script changes also require refreshing the target tab.
-
-There are no lint, test, or build commands configured.
+After editing files, run `npm run build` then click the reload button on the extension card in `chrome://extensions`. Content script changes also require refreshing the target tab.
 
 ## Architecture
 
 The extension has three main execution contexts that communicate via Chrome runtime messages:
 
-### 1. Content Script (`content.js` + `content.css`)
+### 1. Content Script (`src/content.ts` → `dist/content.js` + `content.css`)
 Injected into every webpage. Responsibilities:
 - Detects intentional text selections (distinguishes drag/double-click/triple-click from accidental stale selections)
 - Shows a floating popup button near selected text
@@ -31,7 +37,7 @@ Injected into every webpage. Responsibilities:
 - Sends `addFavorite` / `addToPlaylist` messages for track actions
 - Opens Tidal deep links (app protocol or web fallback) via `openTidalLink()`
 
-### 2. Background Service Worker (`background.js`)
+### 2. Background Service Worker (`src/background.ts` → `dist/background.js`)
 Handles all privileged operations:
 - **OAuth 2.0 + PKCE**: Full authentication flow using `chrome.identity`
 - **Token lifecycle**: `getValidToken()` auto-refreshes tokens expiring within 60 seconds
@@ -39,12 +45,13 @@ Handles all privileged operations:
 - **Context menu**: Creates "Search in Tidal" right-click menu for selected text
 - **Message routing**: Listens for messages from content script and results popup, dispatches to handler functions
 
-### 3. Options Page (`options/`) + Results Popup (`results/`)
+### 3. Options Page + Results Popup (`src/options/options.ts`, `src/results/results.ts`)
 - `options/`: OAuth login UI, username display, toggle for selection popup behavior — stores settings in `chrome.storage.local`
 - `results/`: Standalone 500×620px search window launched by context menu (vs. the inline panel launched by text selection)
+- Shared utilities in `src/shared/`: `types.ts` (interfaces), `constants.ts` (API URLs, credentials), `tracks.ts` (extractTracks, formatDuration), `utils.ts` (escapeHtml, openTidalLink)
 
 ### Message Protocol
-Content script → background: `{ action: "search" | "getPlaylists" | "addFavorite" | "addToPlaylist", ... }`
+Content script → background: `{ type: "SEARCH" | "GET_PLAYLISTS" | "ADD_FAVORITE" | "ADD_TO_PLAYLIST" | "OPEN_RESULTS" | "STORE_TOKENS", ... }` (typed as `ExtensionMessage` discriminated union in `src/shared/types.ts`)
 Background stores transient search queries in `chrome.storage.session` key `tidalIdQuery` for the results popup to pick up.
 
 ### Chrome Storage Keys
