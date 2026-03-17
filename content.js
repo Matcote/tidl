@@ -60,6 +60,11 @@ document.addEventListener('mouseup', (e) => {
 
   if (!selectionIntent) return;
 
+  // If this is a double-click, delay slightly so a triple-click can complete
+  // first — otherwise the popup flickers on before being replaced by the
+  // triple-click's full-line selection.
+  const delay = e.detail === 2 ? 200 : 0;
+
   setTimeout(async () => {
     let selectionPopup = true;
     try {
@@ -125,7 +130,7 @@ document.addEventListener('mouseup', (e) => {
     });
 
     document.body.appendChild(tidalPopupBtn);
-  }, 20);
+  }, delay);
 });
 
 document.addEventListener('keydown', (e) => {
