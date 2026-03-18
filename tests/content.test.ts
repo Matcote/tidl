@@ -42,12 +42,12 @@ describe('addFavoriteInline', () => {
     await p;
   });
 
-  it('shows ✓ Added on success', async () => {
+  it('shows ♥ Favorited on success', async () => {
     (chrome.runtime.sendMessage as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true });
     const btn = makeButton();
     await addFavoriteInline('track-1', btn);
-    expect(btn.textContent).toBe('✓ Added');
-    expect(btn.classList.contains('added')).toBe(true);
+    expect(btn.textContent).toBe('♥ Favorited');
+    expect(btn.classList.contains('favorited')).toBe(true);
   });
 
   it('restores button on error', async () => {

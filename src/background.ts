@@ -8,6 +8,7 @@ import type {
   SearchResponse,
   PlaylistsResponse,
   MutationResponse,
+  FavoritesResponse,
 } from './shared/types';
 
 // ─── Context Menu Setup ──────────────────────────────────────────────────────
@@ -54,10 +55,13 @@ chrome.runtime.onMessage.addListener((msg: ExtensionMessage, _sender, sendRespon
       handleGetPlaylists().then(sendResponse);
       return true;
     case 'ADD_FAVORITE':
-      handleAddFavorite(msg.trackId).then(sendResponse);
+      handleAddFavorite(msg.trackId).then(sendResponse, (err) => sendResponse({ error: String(err) }));
       return true;
     case 'ADD_TO_PLAYLIST':
       handleAddToPlaylist(msg.trackId, msg.playlistId).then(sendResponse);
+      return true;
+    case 'GET_FAVORITES':
+      handleGetFavorites().then(sendResponse);
       return true;
     case 'STORE_TOKENS':
       storeTokens(msg.data).then(() => sendResponse({ ok: true }));
@@ -105,10 +109,22 @@ export async function handleAddFavorite(trackId: string): Promise<MutationRespon
   const stored = await chrome.storage.local.get(['userId', 'countryCode']) as { userId?: string; countryCode?: string };
   const countryCode = stored.countryCode ?? 'CA';
   const url = `${TIDAL_API_BASE}/userCollections/${stored.userId}/relationships/tracks?countryCode=${countryCode}`;
-  return tidalFetch(url, {
+  const result = await tidalFetch(url, {
     method: 'POST',
     body: JSON.stringify({ data: [{ id: String(trackId), type: 'tracks' }] }),
-  }) as Promise<MutationResponse>;
+  }) as MutationResponse;
+
+  // Optimistically update the cached favorites
+  if (!result.error) {
+    const cache = await chrome.storage.local.get('favoritedTrackIds') as { favoritedTrackIds?: string[] };
+    const ids = cache.favoritedTrackIds ?? [];
+    if (!ids.includes(String(trackId))) {
+      ids.push(String(trackId));
+      await chrome.storage.local.set({ favoritedTrackIds: ids });
+    }
+  }
+
+  return result;
 }
 
 export async function handleAddToPlaylist(trackId: string, playlistId: string): Promise<MutationResponse> {
@@ -119,6 +135,82 @@ export async function handleAddToPlaylist(trackId: string, playlistId: string): 
     method: 'POST',
     body: JSON.stringify({ data: [{ id: String(trackId), type: 'tracks' }] }),
   }) as Promise<MutationResponse>;
+}
+
+// ─── Favorites ──────────────────────────────────────────────────────────────
+
+const FAVORITES_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+async function fetchAllFavoriteIds(): Promise<string[]> {
+  const stored = await chrome.storage.local.get(['userId', 'countryCode']) as {
+    userId?: string; countryCode?: string;
+  };
+  if (!stored.userId) return [];
+  const countryCode = stored.countryCode ?? 'CA';
+
+  const ids: string[] = [];
+  let url: string | null =
+    `${TIDAL_API_BASE}/userCollections/${stored.userId}/relationships/tracks?countryCode=${countryCode}`;
+  let pages = 0;
+  const MAX_PAGES = 200;
+
+  while (url && pages < MAX_PAGES) {
+    const result = await tidalFetch(url) as Record<string, unknown>;
+    if ('error' in result) {
+      console.warn('[TidalID] Favorites fetch error:', result.error);
+      break;
+    }
+
+    const data = result.data as Array<{ id: string }> | undefined;
+    if (data) {
+      for (const item of data) ids.push(item.id);
+    }
+
+    // Follow pagination — next may be relative or absolute
+    const next = (result as { links?: { next?: string } }).links?.next ?? null;
+    if (next) {
+      url = next.startsWith('http') ? next : `https://openapi.tidal.com/v2${next}`;
+    } else {
+      url = null;
+    }
+
+    pages++;
+    if (url) await new Promise(r => setTimeout(r, 100)); // rate-limit protection
+  }
+
+  // Only cache if we actually fetched at least one page successfully
+  if (pages > 0) {
+    await chrome.storage.local.set({
+      favoritedTrackIds: ids,
+      favoritesLastFetched: Date.now(),
+    });
+  }
+  return ids;
+}
+
+async function handleGetFavorites(): Promise<FavoritesResponse> {
+  try {
+    const token = await getValidToken();
+    if (!token) return { trackIds: [] };
+
+    const stored = await chrome.storage.local.get(['favoritedTrackIds', 'favoritesLastFetched']) as {
+      favoritedTrackIds?: string[]; favoritesLastFetched?: number;
+    };
+
+    if (
+      stored.favoritedTrackIds &&
+      stored.favoritesLastFetched &&
+      Date.now() - stored.favoritesLastFetched < FAVORITES_CACHE_TTL
+    ) {
+      return { trackIds: stored.favoritedTrackIds };
+    }
+
+    const trackIds = await fetchAllFavoriteIds();
+    return { trackIds };
+  } catch (err) {
+    console.error('[TidalID] Failed to fetch favorites:', err);
+    return { trackIds: [] };
+  }
 }
 
 // ─── Authenticated Fetch ─────────────────────────────────────────────────────
@@ -199,4 +291,6 @@ export async function storeTokens(data: OAuthTokenResponse): Promise<void> {
   };
   if (data.user_id !== undefined) update['userId'] = data.user_id;
   await chrome.storage.local.set(update);
+  // Clear favorites cache — user identity may have changed
+  await chrome.storage.local.remove(['favoritedTrackIds', 'favoritesLastFetched']);
 }

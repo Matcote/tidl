@@ -329,6 +329,8 @@
 .tidp-btn-fav.added,
 .tidp-btn-pl.added  { border-color: #22c55e; color: #22c55e; cursor: default; }
 
+.tidp-btn-fav.favorited { border-color: #ff4d6a; color: #ff4d6a; cursor: default; }
+
 /* ─── Playlist Picker ────────────────────────────────────── */
 
 .tidp-pl-picker {

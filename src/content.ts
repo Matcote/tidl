@@ -4,7 +4,7 @@
 
 import { extractTracks } from './shared/tracks';
 import { escapeHtml, openTidalLink } from './shared/utils';
-import type { Track, Playlist, PlaylistsResponse, SearchResponse } from './shared/types';
+import type { Track, Playlist, PlaylistsResponse, SearchResponse, FavoritesResponse } from './shared/types';
 
 let tidalPopupBtn: HTMLButtonElement | null = null;
 let tidalPanel: HTMLDivElement | null = null;
@@ -245,11 +245,12 @@ function openSearchPanel(
 // ─── Search & Data ────────────────────────────────────────────────────────────
 
 async function doSearch(query: string): Promise<void> {
-  let searchResult: SearchResponse, playlistResult: PlaylistsResponse;
+  let searchResult: SearchResponse, playlistResult: PlaylistsResponse, favoritesResult: FavoritesResponse;
   try {
-    [searchResult, playlistResult] = await Promise.all([
+    [searchResult, playlistResult, favoritesResult] = await Promise.all([
       chrome.runtime.sendMessage({ type: 'SEARCH', query }) as Promise<SearchResponse>,
       chrome.runtime.sendMessage({ type: 'GET_PLAYLISTS' }) as Promise<PlaylistsResponse>,
+      chrome.runtime.sendMessage({ type: 'GET_FAVORITES' }) as Promise<FavoritesResponse>,
     ]);
   } catch { removePanel(); return; }
 
@@ -282,13 +283,14 @@ async function doSearch(query: string): Promise<void> {
     return;
   }
 
-  renderTracks(tracks, results as HTMLUListElement);
+  const favoritedIds = new Set(favoritesResult.trackIds ?? []);
+  renderTracks(tracks, results as HTMLUListElement, favoritedIds);
   results.classList.remove('tidp-hidden');
 }
 
 // ─── Render ───────────────────────────────────────────────────────────────────
 
-function renderTracks(tracks: Track[], listEl: HTMLUListElement): void {
+function renderTracks(tracks: Track[], listEl: HTMLUListElement, favoritedIds: Set<string>): void {
   listEl.innerHTML = '';
 
   for (const track of tracks) {
@@ -328,11 +330,16 @@ function renderTracks(tracks: Track[], listEl: HTMLUListElement): void {
 
     const favBtn = document.createElement('button');
     favBtn.className = 'tidp-btn-fav';
-    favBtn.textContent = '♡ Fav';
-    favBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      addFavoriteInline(track.id, favBtn);
-    });
+    if (favoritedIds.has(track.id)) {
+      favBtn.textContent = '♥ Favorited';
+      favBtn.classList.add('favorited');
+    } else {
+      favBtn.textContent = '♡ Fav';
+      favBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        addFavoriteInline(track.id, favBtn);
+      });
+    }
 
     const plBtn = document.createElement('button');
     plBtn.className = 'tidp-btn-pl';
@@ -363,7 +370,7 @@ function renderTracks(tracks: Track[], listEl: HTMLUListElement): void {
 // ─── Actions ──────────────────────────────────────────────────────────────────
 
 export async function addFavoriteInline(trackId: string, btn: HTMLButtonElement): Promise<void> {
-  if (btn.classList.contains('added')) return;
+  if (btn.classList.contains('favorited')) return;
   btn.textContent = '…';
   btn.disabled = true;
   const result = (await chrome.runtime.sendMessage({ type: 'ADD_FAVORITE', trackId })) as { error?: string };
@@ -371,8 +378,8 @@ export async function addFavoriteInline(trackId: string, btn: HTMLButtonElement)
     btn.textContent = '♡ Fav';
     btn.disabled = false;
   } else {
-    btn.textContent = '✓ Added';
-    btn.classList.add('added');
+    btn.textContent = '♥ Favorited';
+    btn.classList.add('favorited');
   }
 }
 

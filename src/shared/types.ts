@@ -5,7 +5,8 @@ export type ExtensionMessage =
   | { type: 'ADD_FAVORITE'; trackId: string }
   | { type: 'ADD_TO_PLAYLIST'; trackId: string; playlistId: string }
   | { type: 'OPEN_RESULTS'; query: string }
-  | { type: 'STORE_TOKENS'; data: OAuthTokenResponse };
+  | { type: 'STORE_TOKENS'; data: OAuthTokenResponse }
+  | { type: 'GET_FAVORITES' };
 
 // Normalized domain objects
 export interface Track {
@@ -28,6 +29,7 @@ export interface TidalJsonApiResource {
 export interface SearchResponse { error?: string; data?: TidalJsonApiResource[]; included?: TidalJsonApiResource[] }
 export interface PlaylistsResponse { error?: string; data?: TidalJsonApiResource[] }
 export interface MutationResponse { ok?: true; error?: string; status?: number }
+export interface FavoritesResponse { error?: string; trackIds?: string[] }
 
 // OAuth
 export interface OAuthTokenResponse {
@@ -39,5 +41,6 @@ export interface OAuthTokenResponse {
 export interface LocalStorage {
   accessToken?: string; refreshToken?: string; expiresAt?: number;
   userId?: string; tidalUsername?: string; countryCode?: string; selectionPopup?: boolean;
+  favoritedTrackIds?: string[]; favoritesLastFetched?: number;
 }
 export interface SessionStorage { tidalIdQuery?: string }

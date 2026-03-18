@@ -180,6 +180,8 @@ header {
 .btn-fav.added { border-color: #22c55e; color: #22c55e; cursor: default; }
 .btn-playlist.added { border-color: #22c55e; color: #22c55e; cursor: default; }
 
+.btn-fav.favorited { border-color: #ff4d6a; color: #ff4d6a; cursor: default; }
+
 /* ─── Playlist Picker ────────────────────────────── */
 
 #playlist-picker {

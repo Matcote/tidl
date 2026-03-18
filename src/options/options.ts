@@ -135,7 +135,7 @@ connectBtn.addEventListener('click', async () => {
 // ─── Disconnect ───────────────────────────────────────────────────────────────
 
 disconnectBtn.addEventListener('click', async () => {
-  await chrome.storage.local.remove(['accessToken', 'refreshToken', 'expiresAt', 'tidalUsername', 'countryCode']);
+  await chrome.storage.local.remove(['accessToken', 'refreshToken', 'expiresAt', 'tidalUsername', 'countryCode', 'favoritedTrackIds', 'favoritesLastFetched']);
   statusConnected.classList.add('hidden');
   statusDisconnected.classList.remove('hidden');
   connectBtn.classList.remove('hidden');
