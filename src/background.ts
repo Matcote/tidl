@@ -251,9 +251,10 @@ export async function tidalFetch(
     return { error: `API error ${res.status}`, status: res.status };
   }
 
-  // Some endpoints return 204 No Content on success
-  if (res.status === 204) return { ok: true };
-  return res.json() as Promise<SearchResponse | PlaylistsResponse | MutationResponse>;
+  // Mutation endpoints may return 200, 201, 202, or 204 with no body
+  const text = await res.text();
+  if (!text) return { ok: true };
+  return JSON.parse(text) as SearchResponse | PlaylistsResponse | MutationResponse;
 }
 
 // ─── Token Management ────────────────────────────────────────────────────────
