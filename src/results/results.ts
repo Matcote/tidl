@@ -28,10 +28,9 @@ async function init(): Promise<void> {
 
   queryLabel.textContent = tidalIdQuery;
 
-  const [searchResult, playlistResult, favoritesResult] = await Promise.all([
+  const [searchResult, playlistResult] = await Promise.all([
     chrome.runtime.sendMessage({ type: 'SEARCH', query: tidalIdQuery }) as Promise<SearchResponse>,
     chrome.runtime.sendMessage({ type: 'GET_PLAYLISTS' }) as Promise<PlaylistsResponse>,
-    chrome.runtime.sendMessage({ type: 'GET_FAVORITES' }) as Promise<FavoritesResponse>,
   ]);
 
   if (playlistResult.data) {
@@ -52,13 +51,20 @@ async function init(): Promise<void> {
     return;
   }
 
-  const favoritedIds = new Set(favoritesResult.trackIds ?? []);
-  renderTracks(tracks, favoritedIds);
+  renderTracks(tracks);
+
+  // Fetch favorites in background and update hearts when ready
+  (chrome.runtime.sendMessage({ type: 'GET_FAVORITES' }) as Promise<FavoritesResponse>)
+    .then(favResult => {
+      const favIds = new Set(favResult.trackIds ?? []);
+      markFavoritedButtons(favIds);
+    })
+    .catch(() => {}); // silently ignore — buttons stay as ♡ Fav
 }
 
 // ─── Render ───────────────────────────────────────────────────────────────────
 
-function renderTracks(tracks: Track[], favoritedIds: Set<string>): void {
+function renderTracks(tracks: Track[]): void {
   resultsList.innerHTML = '';
 
   for (const track of tracks) {
@@ -98,13 +104,9 @@ function renderTracks(tracks: Track[], favoritedIds: Set<string>): void {
 
     const favBtn = document.createElement('button');
     favBtn.className = 'btn-fav';
-    if (favoritedIds.has(track.id)) {
-      favBtn.textContent = '♥ Favorited';
-      favBtn.classList.add('favorited');
-    } else {
-      favBtn.textContent = '♡ Fav';
-      favBtn.addEventListener('click', () => addFavorite(track.id, favBtn));
-    }
+    favBtn.dataset['trackId'] = track.id;
+    favBtn.textContent = '♡ Fav';
+    favBtn.addEventListener('click', () => addFavorite(track.id, favBtn));
 
     const plBtn = document.createElement('button');
     plBtn.className = 'btn-playlist';
@@ -132,6 +134,16 @@ resultsList.addEventListener('click', (e) => {
     (link as HTMLElement).dataset['webUrl'] ?? '',
   );
 });
+
+function markFavoritedButtons(favIds: Set<string>): void {
+  for (const btn of Array.from(resultsList.querySelectorAll<HTMLButtonElement>('.btn-fav[data-track-id]'))) {
+    const trackId = btn.dataset['trackId']!;
+    if (favIds.has(trackId) && !btn.classList.contains('favorited')) {
+      btn.textContent = '♥ Favorited';
+      btn.classList.add('favorited');
+    }
+  }
+}
 
 // ─── Actions ──────────────────────────────────────────────────────────────────
 

@@ -245,12 +245,11 @@ function openSearchPanel(
 // ─── Search & Data ────────────────────────────────────────────────────────────
 
 async function doSearch(query: string): Promise<void> {
-  let searchResult: SearchResponse, playlistResult: PlaylistsResponse, favoritesResult: FavoritesResponse;
+  let searchResult: SearchResponse, playlistResult: PlaylistsResponse;
   try {
-    [searchResult, playlistResult, favoritesResult] = await Promise.all([
+    [searchResult, playlistResult] = await Promise.all([
       chrome.runtime.sendMessage({ type: 'SEARCH', query }) as Promise<SearchResponse>,
       chrome.runtime.sendMessage({ type: 'GET_PLAYLISTS' }) as Promise<PlaylistsResponse>,
-      chrome.runtime.sendMessage({ type: 'GET_FAVORITES' }) as Promise<FavoritesResponse>,
     ]);
   } catch { removePanel(); return; }
 
@@ -283,14 +282,22 @@ async function doSearch(query: string): Promise<void> {
     return;
   }
 
-  const favoritedIds = new Set(favoritesResult.trackIds ?? []);
-  renderTracks(tracks, results as HTMLUListElement, favoritedIds);
+  renderTracks(tracks, results as HTMLUListElement);
   results.classList.remove('tidp-hidden');
+
+  // Fetch favorites in background and update hearts when ready
+  (chrome.runtime.sendMessage({ type: 'GET_FAVORITES' }) as Promise<FavoritesResponse>)
+    .then(favResult => {
+      if (!tidalPanel) return;
+      const favIds = new Set(favResult.trackIds ?? []);
+      markFavoritedButtons(results as HTMLUListElement, favIds);
+    })
+    .catch(() => {}); // silently ignore — buttons stay as ♡ Fav
 }
 
 // ─── Render ───────────────────────────────────────────────────────────────────
 
-function renderTracks(tracks: Track[], listEl: HTMLUListElement, favoritedIds: Set<string>): void {
+function renderTracks(tracks: Track[], listEl: HTMLUListElement): void {
   listEl.innerHTML = '';
 
   for (const track of tracks) {
@@ -330,16 +337,12 @@ function renderTracks(tracks: Track[], listEl: HTMLUListElement, favoritedIds: S
 
     const favBtn = document.createElement('button');
     favBtn.className = 'tidp-btn-fav';
-    if (favoritedIds.has(track.id)) {
-      favBtn.textContent = '♥ Favorited';
-      favBtn.classList.add('favorited');
-    } else {
-      favBtn.textContent = '♡ Fav';
-      favBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        addFavoriteInline(track.id, favBtn);
-      });
-    }
+    favBtn.dataset['trackId'] = track.id;
+    favBtn.textContent = '♡ Fav';
+    favBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      addFavoriteInline(track.id, favBtn);
+    });
 
     const plBtn = document.createElement('button');
     plBtn.className = 'tidp-btn-pl';
@@ -365,6 +368,16 @@ function renderTracks(tracks: Track[], listEl: HTMLUListElement, favoritedIds: S
       (link as HTMLElement).dataset['webUrl'] ?? '',
     );
   });
+}
+
+function markFavoritedButtons(listEl: HTMLUListElement, favIds: Set<string>): void {
+  for (const btn of Array.from(listEl.querySelectorAll<HTMLButtonElement>('.tidp-btn-fav[data-track-id]'))) {
+    const trackId = btn.dataset['trackId']!;
+    if (favIds.has(trackId) && !btn.classList.contains('favorited')) {
+      btn.textContent = '♥ Favorited';
+      btn.classList.add('favorited');
+    }
+  }
 }
 
 // ─── Actions ──────────────────────────────────────────────────────────────────

@@ -149,15 +149,30 @@ async function fetchAllFavoriteIds(): Promise<string[]> {
   const countryCode = stored.countryCode ?? 'CA';
 
   const ids: string[] = [];
+  // Request max page size to minimize number of requests
   let url: string | null =
-    `${TIDAL_API_BASE}/userCollections/${stored.userId}/relationships/tracks?countryCode=${countryCode}`;
+    `${TIDAL_API_BASE}/userCollections/${stored.userId}/relationships/tracks?countryCode=${countryCode}&page[limit]=100`;
   let pages = 0;
   const MAX_PAGES = 200;
 
   while (url && pages < MAX_PAGES) {
-    const result = await tidalFetch(url) as Record<string, unknown>;
-    if ('error' in result) {
-      console.warn('[TidalID] Favorites fetch error:', result.error);
+    let result: Record<string, unknown> | null = null;
+
+    // Retry up to 3 times on rate limit, with increasing backoff
+    for (let attempt = 0; attempt < 3; attempt++) {
+      result = await tidalFetch(url) as Record<string, unknown>;
+      if ('status' in result && (result as { status?: number }).status === 429) {
+        const wait = (attempt + 1) * 3000; // 3s, 6s, 9s
+        console.warn(`[TidalID] Rate limited on favorites fetch, retrying in ${wait / 1000}s...`);
+        await new Promise(r => setTimeout(r, wait));
+        result = null;
+        continue;
+      }
+      break;
+    }
+
+    if (!result || 'error' in result) {
+      console.warn('[TidalID] Favorites fetch error:', result ? result.error : 'rate limit exhausted');
       break;
     }
 
@@ -175,7 +190,7 @@ async function fetchAllFavoriteIds(): Promise<string[]> {
     }
 
     pages++;
-    if (url) await new Promise(r => setTimeout(r, 100)); // rate-limit protection
+    if (url) await new Promise(r => setTimeout(r, 500)); // rate-limit protection
   }
 
   // Only cache if we actually fetched at least one page successfully
