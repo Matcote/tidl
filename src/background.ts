@@ -14,10 +14,12 @@ import type {
 // ─── Context Menu Setup ──────────────────────────────────────────────────────
 
 chrome.runtime.onInstalled.addListener(() => {
-  chrome.contextMenus.create({
-    id: 'tidal-id-search',
-    title: 'Search in Tidal',
-    contexts: ['selection'],
+  chrome.contextMenus.removeAll(() => {
+    chrome.contextMenus.create({
+      id: 'tidal-id-search',
+      title: 'Search in Tidal',
+      contexts: ['selection'],
+    });
   });
 });
 
