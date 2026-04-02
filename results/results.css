@@ -159,9 +159,66 @@ header {
   display: flex;
   gap: 6px;
   flex-shrink: 0;
+  align-items: center;
 }
 
-.btn-fav, .btn-playlist {
+.btn-fav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.35);
+  transition: color 0.15s, filter 0.15s;
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.btn-fav svg {
+  display: block;
+  fill: none;
+  stroke: currentColor;
+  transition: fill 0.2s;
+}
+
+.btn-fav:hover {
+  color: rgba(255, 255, 255, 0.9);
+  filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.5));
+}
+
+.btn-fav.favorited {
+  color: #ff4d6a;
+  cursor: default;
+}
+
+.btn-fav.favorited svg {
+  fill: currentColor;
+}
+
+.btn-fav.favorited:not(.no-anim) svg {
+  animation: heart-pop 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.btn-fav.favorited:hover {
+  filter: drop-shadow(0 0 6px rgba(255, 77, 106, 0.5));
+}
+
+.btn-fav:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+@keyframes heart-pop {
+  0%   { transform: scale(1); }
+  50%  { transform: scale(1.45); }
+  100% { transform: scale(1); }
+}
+
+.btn-playlist {
   padding: 5px 10px;
   border-radius: 6px;
   font-size: 12px;
@@ -174,13 +231,8 @@ header {
   white-space: nowrap;
 }
 
-.btn-fav:hover { border-color: #00FFFF; color: #00FFFF; }
 .btn-playlist:hover { border-color: #a78bfa; color: #a78bfa; }
-
-.btn-fav.added { border-color: #22c55e; color: #22c55e; cursor: default; }
 .btn-playlist.added { border-color: #22c55e; color: #22c55e; cursor: default; }
-
-.btn-fav.favorited { border-color: #ff4d6a; color: #ff4d6a; cursor: default; }
 
 /* ─── Playlist Picker ────────────────────────────── */
 

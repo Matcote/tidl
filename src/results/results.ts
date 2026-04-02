@@ -16,6 +16,8 @@ const playlistList = document.getElementById('playlist-list') as HTMLElement;
 let playlists: Playlist[] = [];
 let activePlBtn: HTMLButtonElement | null = null;
 
+const HEART_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>`;
+
 // ─── Init ─────────────────────────────────────────────────────────────────────
 
 async function init(): Promise<void> {
@@ -105,7 +107,8 @@ function renderTracks(tracks: Track[]): void {
     const favBtn = document.createElement('button');
     favBtn.className = 'btn-fav';
     favBtn.dataset['trackId'] = track.id;
-    favBtn.textContent = '♡ Fav';
+    favBtn.innerHTML = HEART_SVG;
+    favBtn.setAttribute('aria-label', 'Add to favorites');
     favBtn.addEventListener('click', () => addFavorite(track.id, favBtn));
 
     const plBtn = document.createElement('button');
@@ -139,8 +142,8 @@ function markFavoritedButtons(favIds: Set<string>): void {
   for (const btn of Array.from(resultsList.querySelectorAll<HTMLButtonElement>('.btn-fav[data-track-id]'))) {
     const trackId = btn.dataset['trackId']!;
     if (favIds.has(trackId) && !btn.classList.contains('favorited')) {
-      btn.textContent = '♥ Favorited';
-      btn.classList.add('favorited');
+      btn.classList.add('favorited', 'no-anim');
+      btn.setAttribute('aria-label', 'Favorited');
     }
   }
 }
@@ -149,17 +152,15 @@ function markFavoritedButtons(favIds: Set<string>): void {
 
 export async function addFavorite(trackId: string, btn: HTMLButtonElement): Promise<void> {
   if (btn.classList.contains('favorited')) return;
-  btn.textContent = '…';
   btn.disabled = true;
 
   const result = (await chrome.runtime.sendMessage({ type: 'ADD_FAVORITE', trackId })) as { error?: string };
 
   if (result?.error) {
-    btn.textContent = '♡ Fav';
     btn.disabled = false;
   } else {
-    btn.textContent = '♥ Favorited';
     btn.classList.add('favorited');
+    btn.setAttribute('aria-label', 'Favorited');
   }
 }
 

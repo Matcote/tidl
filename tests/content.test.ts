@@ -21,9 +21,9 @@ function makePanel(): HTMLDivElement {
   return panel;
 }
 
-function makeButton(text = '♡ Fav'): HTMLButtonElement {
+function makeButton(): HTMLButtonElement {
   const btn = document.createElement('button');
-  btn.textContent = text;
+  btn.innerHTML = '<svg></svg>';
   document.body.appendChild(btn);
   return btn;
 }
@@ -33,28 +33,27 @@ beforeEach(() => {
 });
 
 describe('addFavoriteInline', () => {
-  it('immediately shows pending state', async () => {
+  it('immediately disables button on click', async () => {
     (chrome.runtime.sendMessage as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true });
     const btn = makeButton();
     const p = addFavoriteInline('track-1', btn);
-    expect(btn.textContent).toBe('…');
     expect(btn.disabled).toBe(true);
     await p;
   });
 
-  it('shows ♥ Favorited on success', async () => {
+  it('adds favorited class on success', async () => {
     (chrome.runtime.sendMessage as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true });
     const btn = makeButton();
     await addFavoriteInline('track-1', btn);
-    expect(btn.textContent).toBe('♥ Favorited');
     expect(btn.classList.contains('favorited')).toBe(true);
+    expect(btn.getAttribute('aria-label')).toBe('Favorited');
   });
 
-  it('restores button on error', async () => {
+  it('re-enables button on error', async () => {
     (chrome.runtime.sendMessage as ReturnType<typeof vi.fn>).mockResolvedValue({ error: 'Not authenticated' });
     const btn = makeButton();
     await addFavoriteInline('track-1', btn);
-    expect(btn.textContent).toBe('♡ Fav');
+    expect(btn.classList.contains('favorited')).toBe(false);
     expect(btn.disabled).toBe(false);
   });
 
@@ -71,10 +70,10 @@ describe('addFavoriteInline', () => {
 describe('togglePlaylistPickerInline — no panel', () => {
   it('does nothing when tidalPanel is null', () => {
     // No panel appended — togglePlaylistPickerInline returns early
-    const btn = makeButton('+ Playlist');
+    const btn = makeButton();
     const e = new MouseEvent('click');
     togglePlaylistPickerInline(e, 'track-1', btn);
-    // No throw, no side effects
-    expect(btn.textContent).toBe('+ Playlist');
+    // No throw, no side effects — button innerHTML unchanged
+    expect(btn.querySelector('svg')).not.toBeNull();
   });
 });

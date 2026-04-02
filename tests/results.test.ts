@@ -43,36 +43,35 @@ beforeEach(() => {
   (chrome.storage.session.get as ReturnType<typeof vi.fn>).mockResolvedValue({});
 });
 
-function makeButton(text = '♡ Fav'): HTMLButtonElement {
+function makeButton(): HTMLButtonElement {
   const btn = document.createElement('button');
-  btn.textContent = text;
+  btn.innerHTML = '<svg></svg>';
   document.body.appendChild(btn);
   return btn;
 }
 
 describe('addFavorite', () => {
-  it('immediately shows pending state', async () => {
+  it('immediately disables button on click', async () => {
     (chrome.runtime.sendMessage as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true });
     const btn = makeButton();
     const p = addFavorite('track-1', btn);
-    expect(btn.textContent).toBe('…');
     expect(btn.disabled).toBe(true);
     await p;
   });
 
-  it('shows ♥ Favorited on success', async () => {
+  it('adds favorited class on success', async () => {
     (chrome.runtime.sendMessage as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true });
     const btn = makeButton();
     await addFavorite('track-1', btn);
-    expect(btn.textContent).toBe('♥ Favorited');
     expect(btn.classList.contains('favorited')).toBe(true);
+    expect(btn.getAttribute('aria-label')).toBe('Favorited');
   });
 
-  it('restores button on error', async () => {
+  it('re-enables button on error', async () => {
     (chrome.runtime.sendMessage as ReturnType<typeof vi.fn>).mockResolvedValue({ error: 'Not authenticated' });
     const btn = makeButton();
     await addFavorite('track-1', btn);
-    expect(btn.textContent).toBe('♡ Fav');
+    expect(btn.classList.contains('favorited')).toBe(false);
     expect(btn.disabled).toBe(false);
   });
 

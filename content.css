@@ -303,9 +303,64 @@
   display: flex;
   gap: 5px;
   flex-shrink: 0;
+  align-items: center;
 }
 
-.tidp-btn-fav,
+.tidp-btn-fav {
+  all: initial;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  cursor: pointer;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.35);
+  transition: color 0.15s, filter 0.15s;
+  flex-shrink: 0;
+}
+
+.tidp-btn-fav svg {
+  display: block;
+  fill: none;
+  stroke: currentColor;
+  transition: fill 0.2s;
+}
+
+.tidp-btn-fav:hover {
+  color: rgba(255, 255, 255, 0.9);
+  filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.5));
+}
+
+.tidp-btn-fav.favorited {
+  color: #ff4d6a;
+  cursor: default;
+}
+
+.tidp-btn-fav.favorited svg {
+  fill: currentColor;
+}
+
+.tidp-btn-fav.favorited:not(.tidp-no-anim) svg {
+  animation: tidp-heart-pop 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.tidp-btn-fav.favorited:hover {
+  filter: drop-shadow(0 0 5px rgba(255, 77, 106, 0.5));
+}
+
+.tidp-btn-fav:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+@keyframes tidp-heart-pop {
+  0%   { transform: scale(1); }
+  50%  { transform: scale(1.45); }
+  100% { transform: scale(1); }
+}
+
 .tidp-btn-pl {
   all: initial;
   font-family: inherit;
@@ -323,13 +378,9 @@
   line-height: 1.4;
 }
 
-.tidp-btn-fav:hover { border-color: #00FFFF; color: #00FFFF; }
 .tidp-btn-pl:hover  { border-color: #a78bfa; color: #a78bfa; }
 
-.tidp-btn-fav.added,
 .tidp-btn-pl.added  { border-color: #22c55e; color: #22c55e; cursor: default; }
-
-.tidp-btn-fav.favorited { border-color: #ff4d6a; color: #ff4d6a; cursor: default; }
 
 /* ─── Playlist Picker ────────────────────────────────────── */
 
