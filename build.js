@@ -58,6 +58,17 @@ async function build() {
   if (watch) {
     await ctx.watch();
     console.log('Watching...');
+    const staticSources = [
+      'options/options.html', 'options/options.css',
+      'results/results.html', 'results/results.css',
+      'content.css', 'manifest.json', 'icons',
+    ];
+    for (const src of staticSources) {
+      fs.watch(src, { recursive: true }, () => {
+        console.log(`[static] ${src} changed, copying...`);
+        copyStaticAssets();
+      });
+    }
   } else {
     await ctx.rebuild();
     await ctx.dispose();
