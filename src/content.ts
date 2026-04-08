@@ -212,7 +212,8 @@ function openSearchPanel(
     <div class="tidp-inner">
       <div class="tidp-header">
         <span class="tidp-logo"><svg xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision" text-rendering="geometricPrecision" image-rendering="optimizeQuality" fill-rule="evenodd" clip-rule="evenodd" viewBox="0 0 512 341.337"><path fill="#fff" fill-rule="nonzero" d="M341.331 85.325l-85.308 85.332 85.32 85.337-85.325 85.343-85.349-85.343 85.343-85.337-85.343-85.343L256.018.006l85.319 85.308L426.675 0 512 85.325l-85.325 85.344-85.344-85.344zm-170.656 0l-85.343 85.344L0 85.325 85.332 0l85.343 85.325z"/></svg></span>
-        <span class="tidp-query">${escapeHtml(query)}</span>
+        <span class="tidp-query-arrow">→</span>
+        <input type="text" class="tidp-query" value="${escapeHtml(query)}" spellcheck="false" autocomplete="off" />
         <button class="tidp-close" aria-label="Close">×</button>
       </div>
       <div class="tidp-body">
@@ -227,6 +228,9 @@ function openSearchPanel(
           <ul class="tidp-pl-list"></ul>
         </div>
       </div>
+      <div class="tidp-body-overlay tidp-hidden">
+        <div class="tidp-spinner"></div>
+      </div>
     </div>
   `;
 
@@ -235,6 +239,23 @@ function openSearchPanel(
   tidalPanel.querySelector('.tidp-close')!.addEventListener('click', (e) => {
     e.stopPropagation();
     removePanel();
+  });
+
+  // Debounced re-search when the user edits the query
+  let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+  const queryInput = tidalPanel.querySelector<HTMLInputElement>('.tidp-query')!;
+  queryInput.addEventListener('input', () => {
+    if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+    searchDebounceTimer = setTimeout(() => {
+      const newQuery = queryInput.value.trim();
+      if (!tidalPanel || newQuery.length < 2) return;
+      const bodyEl = tidalPanel.querySelector<HTMLElement>('.tidp-body')!;
+      const overlay = tidalPanel.querySelector<HTMLElement>('.tidp-body-overlay')!;
+      // Lock current height so panel doesn't shrink while searching
+      bodyEl.style.height = `${bodyEl.clientHeight}px`;
+      overlay.classList.remove('tidp-hidden');
+      doSearch(newQuery, bodyEl, overlay);
+    }, 500);
   });
 
   // Close playlist picker when clicking elsewhere inside panel
@@ -263,7 +284,25 @@ function openSearchPanel(
 
 // ─── Search & Data ────────────────────────────────────────────────────────────
 
-async function doSearch(query: string): Promise<void> {
+function revealBody(bodyEl?: HTMLElement, overlay?: HTMLElement): void {
+  if (!bodyEl || !overlay) return;
+  const toH = Math.min(bodyEl.scrollHeight, 496);
+  overlay.classList.add('tidp-hidden');
+  bodyEl.style.overflowY = 'hidden';
+  bodyEl.style.transition = 'height 0.22s ease';
+  requestAnimationFrame(() => {
+    bodyEl.style.height = `${toH}px`;
+    setTimeout(() => {
+      if (tidalPanel) {
+        bodyEl.style.transition = '';
+        bodyEl.style.height = '';
+        bodyEl.style.overflowY = '';
+      }
+    }, 240);
+  });
+}
+
+async function doSearch(query: string, bodyEl?: HTMLElement, overlay?: HTMLElement): Promise<void> {
   let searchResult: SearchResponse, playlistResult: PlaylistsResponse;
   try {
     [searchResult, playlistResult] = await Promise.all([
@@ -289,27 +328,34 @@ async function doSearch(query: string): Promise<void> {
   }
 
   const loading = tidalPanel.querySelector('.tidp-loading')!;
-  const results = tidalPanel.querySelector('.tidp-results')!;
+  const results = tidalPanel.querySelector<HTMLUListElement>('.tidp-results')!;
   const empty = tidalPanel.querySelector('.tidp-empty')!;
   const errorEl = tidalPanel.querySelector('.tidp-error')!;
 
+  // Reset all states before revealing new content
+  loading.classList.add('tidp-hidden');
+  results.classList.add('tidp-hidden');
+  empty.classList.add('tidp-hidden');
+  errorEl.classList.add('tidp-hidden');
+
   if (searchResult.error) {
-    loading.classList.add('tidp-hidden');
     errorEl.textContent = searchResult.error;
     errorEl.classList.remove('tidp-hidden');
+    revealBody(bodyEl, overlay);
     return;
   }
 
   const tracks = extractTracks(searchResult);
-  loading.classList.add('tidp-hidden');
 
   if (!tracks.length) {
     empty.classList.remove('tidp-hidden');
+    revealBody(bodyEl, overlay);
     return;
   }
 
-  renderTracks(tracks, results as HTMLUListElement);
+  renderTracks(tracks, results);
   results.classList.remove('tidp-hidden');
+  revealBody(bodyEl, overlay);
 
   // Fetch favorites in background and update hearts when ready
   (chrome.runtime.sendMessage({ type: 'GET_FAVORITES' }) as Promise<FavoritesResponse>)
