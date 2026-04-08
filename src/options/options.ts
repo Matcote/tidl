@@ -38,6 +38,53 @@ selectionPopupToggle.addEventListener('change', () => {
   chrome.storage.local.set({ selectionPopup: selectionPopupToggle.checked });
 });
 
+// ─── User Profile ────────────────────────────────────────────────────────────
+
+interface MeResponse {
+  data?: {
+    attributes?: { displayName?: string; firstName?: string; lastName?: string; username?: string };
+    relationships?: { artist?: { data?: { id?: string } } };
+  };
+}
+
+interface ArtistResponse {
+  data?: { attributes?: { name?: string } };
+}
+
+export async function fetchUserProfile(accessToken: string): Promise<string | null> {
+  try {
+    const res = await fetch('https://openapi.tidal.com/v2/users/me', {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!res.ok) return null;
+    const json = await res.json() as MeResponse;
+    console.log('[TidalID] /me response:', JSON.stringify(json));
+
+    // Try display name / full name / username directly on the user object
+    const attrs = json?.data?.attributes;
+    const fullName = [attrs?.firstName, attrs?.lastName].filter(Boolean).join(' ');
+    const direct = attrs?.displayName || fullName || attrs?.username;
+    if (direct) return direct;
+
+    // Fall back to the linked artist profile (the user's "profile" on Tidal)
+    const artistId = json?.data?.relationships?.artist?.data?.id;
+    if (artistId) {
+      const artistRes = await fetch(`https://openapi.tidal.com/v2/artists/${artistId}`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (artistRes.ok) {
+        const artistJson = await artistRes.json() as ArtistResponse;
+        console.log('[TidalID] /artists response:', JSON.stringify(artistJson));
+        return artistJson?.data?.attributes?.name || null;
+      }
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 // ─── OAuth Connect ───────────────────────────────────────────────────────────
 
 connectBtn.addEventListener('click', async () => {
@@ -112,19 +159,24 @@ connectBtn.addEventListener('click', async () => {
     await chrome.storage.local.set({ userId });
   }
 
-  // Decode JWT to extract user info without an extra API call
   let username = `User ${userId}`;
   let countryCode = 'US';
 
-  try {
-    const b64 = data.access_token.split('.')[1]!.replace(/-/g, '+').replace(/_/g, '/');
-    const payload = JSON.parse(atob(b64.padEnd(b64.length + (4 - (b64.length % 4)) % 4, '='))) as TidalJwtPayload;
-    console.log('[TidalID] Token payload:', JSON.stringify(payload));
-    const fullName = [payload.firstName, payload.lastName].filter(Boolean).join(' ');
-    username = payload.username ?? payload.usr ?? fullName ?? payload.email ?? username;
-    countryCode = payload.cc ?? countryCode;
-  } catch (e) {
-    console.warn('[TidalID] JWT decode failed:', e);
+  // Try the /me API endpoint first — it has the actual display name
+  const profileName = await fetchUserProfile(data.access_token);
+  if (profileName) {
+    username = profileName;
+  } else {
+    // Fall back to JWT decode; use || instead of ?? to skip empty strings
+    try {
+      const b64 = data.access_token.split('.')[1]!.replace(/-/g, '+').replace(/_/g, '/');
+      const payload = JSON.parse(atob(b64.padEnd(b64.length + (4 - (b64.length % 4)) % 4, '='))) as TidalJwtPayload;
+      const fullName = [payload.firstName, payload.lastName].filter(Boolean).join(' ');
+      username = payload.username || payload.usr || fullName || payload.email || username;
+      countryCode = payload.cc ?? countryCode;
+    } catch (e) {
+      console.warn('[TidalID] JWT decode failed:', e);
+    }
   }
 
   await chrome.storage.local.set({ tidalUsername: username, countryCode });
