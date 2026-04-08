@@ -87,10 +87,10 @@ describe('addFavorite', () => {
 });
 
 describe('togglePlaylistPicker', () => {
-  it('shows "No playlists" text when playlists array is empty', () => {
-    const btn = makeButton('+ Playlist');
+  it('flashes empty class when playlists array is empty', () => {
+    const btn = makeButton();
     const e = new MouseEvent('click');
     togglePlaylistPicker(e, 'track-1', btn);
-    expect(btn.textContent).toBe('No playlists');
+    expect(btn.classList.contains('btn-pl-empty')).toBe(true);
   });
 });

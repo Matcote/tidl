@@ -363,24 +363,47 @@
 
 .tidp-btn-pl {
   all: initial;
-  font-family: inherit;
-  padding: 4px 8px;
-  border-radius: 5px;
-  font-size: 11px;
-  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
   cursor: pointer;
-  border: 1px solid #2a2a2a;
   background: transparent;
-  color: #888;
-  transition: all 0.15s;
-  white-space: nowrap;
-  box-sizing: border-box;
-  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.35);
+  transition: color 0.15s, filter 0.15s;
+  flex-shrink: 0;
 }
 
-.tidp-btn-pl:hover  { border-color: #a78bfa; color: #a78bfa; }
+.tidp-btn-pl svg {
+  display: block;
+  fill: none;
+  stroke: currentColor;
+}
 
-.tidp-btn-pl.added  { border-color: #22c55e; color: #22c55e; cursor: default; }
+.tidp-btn-pl:hover {
+  color: rgba(255, 255, 255, 0.9);
+  filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.5));
+}
+
+.tidp-btn-pl.added {
+  color: #22c55e;
+  cursor: default;
+}
+
+.tidp-btn-pl.added:hover {
+  filter: drop-shadow(0 0 5px rgba(34, 197, 94, 0.5));
+}
+
+.tidp-btn-pl.tidp-btn-pl-empty {
+  color: #f59e0b;
+}
+
+.tidp-btn-pl:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
 
 /* ─── Playlist Picker ────────────────────────────────────── */
 
