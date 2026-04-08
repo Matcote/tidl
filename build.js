@@ -3,6 +3,23 @@ const fs = require('fs');
 
 const watch = process.argv.includes('--watch');
 
+function loadEnv() {
+  const env = {};
+  if (fs.existsSync('.env')) {
+    fs.readFileSync('.env', 'utf8').split('\n').forEach(line => {
+      const eqIdx = line.indexOf('=');
+      if (eqIdx > 0) {
+        const key = line.slice(0, eqIdx).trim();
+        const val = line.slice(eqIdx + 1).trim();
+        if (key) env[key] = val;
+      }
+    });
+  }
+  return env;
+}
+
+const env = loadEnv();
+
 const entryPoints = [
   { in: 'src/background.ts',      out: 'dist/background' },
   { in: 'src/content.ts',         out: 'dist/content' },
@@ -33,6 +50,10 @@ async function build() {
     target: ['chrome120'],
     format: 'iife',
     sourcemap: true,
+    define: {
+      'process.env.TIDAL_CLIENT_ID':     JSON.stringify(env.TIDAL_CLIENT_ID || ''),
+      'process.env.TIDAL_CLIENT_SECRET': JSON.stringify(env.TIDAL_CLIENT_SECRET || ''),
+    },
   });
   if (watch) {
     await ctx.watch();

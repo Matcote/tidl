@@ -3,6 +3,6 @@ export const TIDAL_TOKEN_URL = 'https://auth.tidal.com/v1/oauth2/token';
 export const TIDAL_API_BASE = 'https://openapi.tidal.com/v2';
 export const SCOPES = 'collection.read collection.write playlists.read playlists.write user.read search.read';
 
-// Replace these with your credentials from developer.tidal.com
-export const CLIENT_ID = 'HutZLClIEk6xcdjR';
-export const CLIENT_SECRET = 'a5wvhdWaf3XmbYWUTMazqWArXuwugoYVHQcgKpwRpr4=';
+// Set TIDAL_CLIENT_ID and TIDAL_CLIENT_SECRET in your .env file (see .env.example)
+export const CLIENT_ID     = process.env.TIDAL_CLIENT_ID     || '';
+export const CLIENT_SECRET = process.env.TIDAL_CLIENT_SECRET || '';
