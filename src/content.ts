@@ -4,12 +4,14 @@
 
 import { extractTracks } from './shared/tracks';
 import { escapeHtml, openTidalLink } from './shared/utils';
-import type { Track, Playlist, PlaylistsResponse, SearchResponse, FavoritesResponse } from './shared/types';
+import type { Track, Playlist, PlaylistsResponse, PlaylistTracksResponse, SearchResponse, FavoritesResponse } from './shared/types';
 
 let tidalPopupBtn: HTMLButtonElement | null = null;
 let tidalPanel: HTMLDivElement | null = null;
 let panelPlaylists: Playlist[] = [];
 let panelActivePlBtn: HTMLButtonElement | null = null;
+let panelPlaylistTrackMap: Record<string, string[]> = {};
+const panelAddedMap = new Map<string, Set<string>>();
 
 const PANEL_WIDTH = 400;
 const PANEL_HEIGHT = 540;
@@ -34,6 +36,8 @@ function removePanel(): void {
   }
   panelPlaylists = [];
   panelActivePlBtn = null;
+  panelPlaylistTrackMap = {};
+  panelAddedMap.clear();
 }
 
 // ─── Text Selection Popup ─────────────────────────────────────────────────────
@@ -264,6 +268,13 @@ async function doSearch(query: string): Promise<void> {
       id: p.id,
       name: (p.attributes?.['name'] as string | undefined) ?? 'Untitled Playlist',
     }));
+    // Fetch which tracks are in each playlist (cached after first load)
+    (chrome.runtime.sendMessage({
+      type: 'GET_PLAYLIST_TRACKS',
+      playlistIds: panelPlaylists.map(p => p.id),
+    }) as Promise<PlaylistTracksResponse>).then(result => {
+      if (result.trackMap) panelPlaylistTrackMap = result.trackMap;
+    }).catch(() => {});
   }
 
   const loading = tidalPanel.querySelector('.tidp-loading')!;
@@ -426,8 +437,15 @@ export function togglePlaylistPickerInline(
   listEl.innerHTML = '';
 
   for (const playlist of panelPlaylists) {
+    const alreadyIn = (panelPlaylistTrackMap[playlist.id]?.includes(trackId) ?? false)
+      || (panelAddedMap.get(trackId)?.has(playlist.id) ?? false);
     const li = document.createElement('li');
-    li.textContent = playlist.name;
+    if (alreadyIn) {
+      li.classList.add('tidp-pl-added');
+      li.innerHTML = `<span class="tidp-pl-check">✓</span>${escapeHtml(playlist.name)}`;
+    } else {
+      li.textContent = playlist.name;
+    }
     li.addEventListener('click', async () => {
       picker.classList.add('tidp-hidden');
       panelActivePlBtn = null;
@@ -440,8 +458,15 @@ export function togglePlaylistPickerInline(
       if (result?.error) {
         btn.disabled = false;
       } else {
+        if (!panelAddedMap.has(trackId)) panelAddedMap.set(trackId, new Set());
+        panelAddedMap.get(trackId)!.add(playlist.id);
         btn.innerHTML = CHECK_SVG;
         btn.classList.add('added');
+        setTimeout(() => {
+          btn.innerHTML = PLUS_SVG;
+          btn.classList.remove('added');
+          btn.disabled = false;
+        }, 1500);
       }
     });
     listEl.appendChild(li);

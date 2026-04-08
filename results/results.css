@@ -301,4 +301,19 @@ header {
 
 #playlist-list li:hover { background: #222; color: #fff; }
 
+#playlist-list li.pl-added {
+  color: #22c55e;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+#playlist-list li.pl-added:hover {
+  background: transparent;
+  color: #22c55e;
+}
+.pl-check {
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
 .hidden { display: none !important; }

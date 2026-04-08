@@ -2,7 +2,7 @@
 
 import { extractTracks } from '../shared/tracks';
 import { escapeHtml, openTidalLink } from '../shared/utils';
-import type { Track, Playlist, PlaylistsResponse, SearchResponse, FavoritesResponse } from '../shared/types';
+import type { Track, Playlist, PlaylistsResponse, PlaylistTracksResponse, SearchResponse, FavoritesResponse } from '../shared/types';
 
 const stateLoading = document.getElementById('state-loading') as HTMLElement;
 const stateEmpty = document.getElementById('state-empty') as HTMLElement;
@@ -15,6 +15,8 @@ const playlistList = document.getElementById('playlist-list') as HTMLElement;
 
 let playlists: Playlist[] = [];
 let activePlBtn: HTMLButtonElement | null = null;
+let playlistTrackMap: Record<string, string[]> = {};
+const addedMap = new Map<string, Set<string>>();
 
 const HEART_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>`;
 const PLUS_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`;
@@ -42,6 +44,13 @@ async function init(): Promise<void> {
       id: p.id,
       name: (p.attributes?.['title'] as string | undefined) ?? 'Untitled Playlist',
     }));
+    // Fetch which tracks are in each playlist (cached after first load)
+    (chrome.runtime.sendMessage({
+      type: 'GET_PLAYLIST_TRACKS',
+      playlistIds: playlists.map(p => p.id),
+    }) as Promise<PlaylistTracksResponse>).then(result => {
+      if (result.trackMap) playlistTrackMap = result.trackMap;
+    }).catch(() => {});
   }
 
   if (searchResult.error) {
@@ -187,8 +196,15 @@ export function togglePlaylistPicker(e: MouseEvent, trackId: string, btn: HTMLBu
   playlistList.innerHTML = '';
 
   for (const playlist of playlists) {
+    const alreadyIn = (playlistTrackMap[playlist.id]?.includes(trackId) ?? false)
+      || (addedMap.get(trackId)?.has(playlist.id) ?? false);
     const li = document.createElement('li');
-    li.textContent = playlist.name;
+    if (alreadyIn) {
+      li.classList.add('pl-added');
+      li.innerHTML = `<span class="pl-check">✓</span>${escapeHtml(playlist.name)}`;
+    } else {
+      li.textContent = playlist.name;
+    }
     li.addEventListener('click', async () => {
       playlistPicker.classList.add('hidden');
       activePlBtn = null;
@@ -203,8 +219,15 @@ export function togglePlaylistPicker(e: MouseEvent, trackId: string, btn: HTMLBu
       if (result?.error) {
         btn.disabled = false;
       } else {
+        if (!addedMap.has(trackId)) addedMap.set(trackId, new Set());
+        addedMap.get(trackId)!.add(playlist.id);
         btn.innerHTML = CHECK_SVG;
         btn.classList.add('added');
+        setTimeout(() => {
+          btn.innerHTML = PLUS_SVG;
+          btn.classList.remove('added');
+          btn.disabled = false;
+        }, 1500);
       }
     });
     playlistList.appendChild(li);

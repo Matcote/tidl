@@ -2,6 +2,7 @@
 export type ExtensionMessage =
   | { type: 'SEARCH'; query: string }
   | { type: 'GET_PLAYLISTS' }
+  | { type: 'GET_PLAYLIST_TRACKS'; playlistIds: string[] }
   | { type: 'ADD_FAVORITE'; trackId: string }
   | { type: 'ADD_TO_PLAYLIST'; trackId: string; playlistId: string }
   | { type: 'OPEN_RESULTS'; query: string }
@@ -28,6 +29,7 @@ export interface TidalJsonApiResource {
 }
 export interface SearchResponse { error?: string; data?: TidalJsonApiResource[]; included?: TidalJsonApiResource[] }
 export interface PlaylistsResponse { error?: string; data?: TidalJsonApiResource[] }
+export interface PlaylistTracksResponse { error?: string; trackMap?: Record<string, string[]> }
 export interface MutationResponse { ok?: true; error?: string; status?: number }
 export interface FavoritesResponse { error?: string; trackIds?: string[] }
 
@@ -42,5 +44,6 @@ export interface LocalStorage {
   accessToken?: string; refreshToken?: string; expiresAt?: number;
   userId?: string; tidalUsername?: string; countryCode?: string; selectionPopup?: boolean;
   favoritedTrackIds?: string[]; favoritesLastFetched?: number;
+  playlistTrackMap?: Record<string, string[]>; playlistTracksFetched?: number;
 }
 export interface SessionStorage { tidalIdQuery?: string }

@@ -447,6 +447,21 @@
 
 .tidp-pl-list li:hover { background: #222; color: #fff; }
 
+.tidp-pl-list li.tidp-pl-added {
+  color: #22c55e;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.tidp-pl-list li.tidp-pl-added:hover {
+  background: transparent;
+  color: #22c55e;
+}
+.tidp-pl-check {
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
 /* ─── Utility ────────────────────────────────────────────── */
 
 .tidp-hidden { display: none !important; }
