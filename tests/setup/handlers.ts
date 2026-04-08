@@ -21,4 +21,7 @@ export const handlers = [
   http.post(`${TIDAL_API_BASE}/playlists/:playlistId/relationships/items`, () =>
     new HttpResponse(null, { status: 204 }),
   ),
+  http.get(`${TIDAL_API_BASE}/playlists/:playlistId/relationships/items`, () =>
+    HttpResponse.json({ data: [] }),
+  ),
 ];
