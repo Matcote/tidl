@@ -42,6 +42,16 @@ function removePanel(): void {
 
 // ─── Text Selection Popup ─────────────────────────────────────────────────────
 
+export function isEditableTarget(el: Element | null): boolean {
+  if (!el) return false;
+  return (
+    el instanceof HTMLInputElement ||
+    el instanceof HTMLTextAreaElement ||
+    el instanceof HTMLSelectElement ||
+    (el instanceof HTMLElement && el.contentEditable === 'true')
+  );
+}
+
 // Track whether the user is intentionally selecting text (drag, double-click,
 // or triple-click) vs. a plain single click that might leave a stale selection.
 let selectionIntent = false;
@@ -71,6 +81,7 @@ document.addEventListener('mouseup', (e) => {
   }
 
   if (!selectionIntent) return;
+  if (isEditableTarget(document.activeElement)) return;
 
   // If this is a double-click, delay slightly so a triple-click can complete
   // first — otherwise the popup flickers on before being replaced by the

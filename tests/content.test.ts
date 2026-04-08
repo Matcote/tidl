@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { addFavoriteInline, togglePlaylistPickerInline } from '../src/content';
+import { addFavoriteInline, togglePlaylistPickerInline, isEditableTarget } from '../src/content';
 
 // panelPlaylists and tidalPanel are module-level in content.ts.
 // We test the exported functions directly, providing a panel fixture.
@@ -64,6 +64,32 @@ describe('addFavoriteInline', () => {
     vi.clearAllMocks();
     await addFavoriteInline('track-1', btn);
     expect(chrome.runtime.sendMessage).not.toHaveBeenCalled();
+  });
+});
+
+describe('isEditableTarget', () => {
+  it('returns false for null', () => {
+    expect(isEditableTarget(null)).toBe(false);
+  });
+  it('returns true for input', () => {
+    expect(isEditableTarget(document.createElement('input'))).toBe(true);
+  });
+  it('returns true for textarea', () => {
+    expect(isEditableTarget(document.createElement('textarea'))).toBe(true);
+  });
+  it('returns true for select', () => {
+    expect(isEditableTarget(document.createElement('select'))).toBe(true);
+  });
+  it('returns true for contenteditable element', () => {
+    const div = document.createElement('div');
+    div.contentEditable = 'true';
+    expect(isEditableTarget(div)).toBe(true);
+  });
+  it('returns false for a normal div', () => {
+    expect(isEditableTarget(document.createElement('div'))).toBe(false);
+  });
+  it('returns false for a paragraph', () => {
+    expect(isEditableTarget(document.createElement('p'))).toBe(false);
   });
 });
 
