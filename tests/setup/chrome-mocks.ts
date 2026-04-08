@@ -58,6 +58,9 @@ const sessionStorageMock = makeStorage(sessionStore);
   windows: {
     create: vi.fn(),
   },
+  action: {
+    onClicked: { addListener: vi.fn() },
+  },
 };
 
 export function seedLocalStorage(data: Record<string, unknown>): void {

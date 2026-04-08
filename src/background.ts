@@ -24,6 +24,10 @@ chrome.runtime.onInstalled.addListener(() => {
   });
 });
 
+chrome.action.onClicked.addListener(() => {
+  chrome.runtime.openOptionsPage();
+});
+
 chrome.contextMenus.onClicked.addListener(async (info) => {
   if (info.menuItemId !== 'tidal-id-search') return;
 

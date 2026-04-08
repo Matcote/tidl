@@ -6,6 +6,8 @@ import { TIDAL_TOKEN_URL, TIDAL_API_BASE, CLIENT_ID, CLIENT_SECRET } from '../sr
 
 // Import after chrome mock is set up (setup files run first)
 const bg = await import('../src/background');
+// Capture listeners registered at module load time before beforeEach clears mocks
+const actionClickedHandler = (chrome.action.onClicked.addListener as ReturnType<typeof vi.fn>).mock.calls[0]?.[0] as (() => void) | undefined;
 
 describe('storeTokens', () => {
   it('writes accessToken, refreshToken, and expiresAt', async () => {
@@ -435,5 +437,13 @@ describe('tidalFetch', () => {
     );
     const result = await bg.tidalFetch(`${TIDAL_API_BASE}/playlists`);
     expect(result).toEqual({ error: 'API error 401', status: 401 });
+  });
+});
+
+describe('action.onClicked', () => {
+  it('registers a listener that opens the options page', () => {
+    expect(actionClickedHandler).toBeTypeOf('function');
+    actionClickedHandler!();
+    expect(chrome.runtime.openOptionsPage).toHaveBeenCalledOnce();
   });
 });
