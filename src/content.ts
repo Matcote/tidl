@@ -272,33 +272,44 @@ function openSearchPanel(
     }
   });
 
+  const bodyEl = tidalPanel.querySelector<HTMLElement>('.tidp-body')!;
+  const overlay = tidalPanel.querySelector<HTMLElement>('.tidp-body-overlay')!;
+
   // Trigger expansion on next two frames (ensures initial styles are painted first)
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
       tidalPanel?.classList.add('tidp-open');
+      // Lock loading-state height so revealBody has a stable start point
+      bodyEl.style.height = `${bodyEl.clientHeight}px`;
     });
   });
 
-  doSearch(query);
+  doSearch(query, bodyEl, overlay);
 }
 
 // ─── Search & Data ────────────────────────────────────────────────────────────
 
 function revealBody(bodyEl?: HTMLElement, overlay?: HTMLElement): void {
   if (!bodyEl || !overlay) return;
+  const fromH = bodyEl.clientHeight;
   const toH = Math.min(bodyEl.scrollHeight, 496);
   overlay.classList.add('tidp-hidden');
   bodyEl.style.overflowY = 'hidden';
-  bodyEl.style.transition = 'height 0.22s ease';
+  // Commit explicit start height with no transition, then animate in next frame
+  bodyEl.style.transition = 'none';
+  bodyEl.style.height = `${fromH}px`;
   requestAnimationFrame(() => {
-    bodyEl.style.height = `${toH}px`;
-    setTimeout(() => {
-      if (tidalPanel) {
-        bodyEl.style.transition = '';
-        bodyEl.style.height = '';
-        bodyEl.style.overflowY = '';
-      }
-    }, 240);
+    requestAnimationFrame(() => {
+      bodyEl.style.transition = 'height 0.22s ease';
+      bodyEl.style.height = `${toH}px`;
+      setTimeout(() => {
+        if (tidalPanel) {
+          bodyEl.style.transition = '';
+          bodyEl.style.height = '';
+          bodyEl.style.overflowY = '';
+        }
+      }, 240);
+    });
   });
 }
 
