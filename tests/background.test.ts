@@ -440,6 +440,98 @@ describe('tidalFetch', () => {
   });
 });
 
+describe('tidalFetch 429 retry', () => {
+  it('retries once on 429 and returns success', async () => {
+    seedLocalStorage({ accessToken: 'tok', expiresAt: Date.now() + 120_000 });
+    vi.useFakeTimers();
+    let calls = 0;
+    server.use(
+      http.get(`${TIDAL_API_BASE}/playlists`, () => {
+        calls++;
+        if (calls === 1) return new HttpResponse(null, { status: 429 });
+        return HttpResponse.json({ data: [] });
+      }),
+    );
+    const promise = bg.tidalFetch(`${TIDAL_API_BASE}/playlists`);
+    await vi.runAllTimersAsync();
+    const result = await promise;
+    expect(result).toEqual({ data: [] });
+    expect(calls).toBe(2);
+    vi.useRealTimers();
+  });
+
+  it('returns error object after exhausting all retries', async () => {
+    seedLocalStorage({ accessToken: 'tok', expiresAt: Date.now() + 120_000 });
+    vi.useFakeTimers();
+    server.use(
+      http.get(`${TIDAL_API_BASE}/playlists`, () => new HttpResponse(null, { status: 429 })),
+    );
+    const promise = bg.tidalFetch(`${TIDAL_API_BASE}/playlists`);
+    await vi.runAllTimersAsync();
+    const result = await promise;
+    expect(result).toEqual({ error: 'API error 429', status: 429 });
+    vi.useRealTimers();
+  });
+
+  it('waits for Retry-After header duration before retrying', async () => {
+    seedLocalStorage({ accessToken: 'tok', expiresAt: Date.now() + 120_000 });
+    vi.useFakeTimers();
+    let calls = 0;
+    server.use(
+      http.get(`${TIDAL_API_BASE}/playlists`, () => {
+        calls++;
+        if (calls === 1) {
+          return new HttpResponse(null, {
+            status: 429,
+            headers: { 'Retry-After': '5' },
+          });
+        }
+        return HttpResponse.json({ data: [] });
+      }),
+    );
+    const promise = bg.tidalFetch(`${TIDAL_API_BASE}/playlists`);
+    await vi.advanceTimersByTimeAsync(5000);
+    const result = await promise;
+    expect(result).toEqual({ data: [] });
+    expect(calls).toBe(2);
+    vi.useRealTimers();
+  });
+
+  it('falls back to computed backoff when Retry-After is absent', async () => {
+    seedLocalStorage({ accessToken: 'tok', expiresAt: Date.now() + 120_000 });
+    vi.useFakeTimers();
+    let calls = 0;
+    server.use(
+      http.get(`${TIDAL_API_BASE}/playlists`, () => {
+        calls++;
+        if (calls === 1) return new HttpResponse(null, { status: 429 });
+        return HttpResponse.json({ data: [] });
+      }),
+    );
+    const promise = bg.tidalFetch(`${TIDAL_API_BASE}/playlists`);
+    // First computed backoff is (0 + 1) * 3000 = 3000ms
+    await vi.advanceTimersByTimeAsync(3000);
+    const result = await promise;
+    expect(result).toEqual({ data: [] });
+    expect(calls).toBe(2);
+    vi.useRealTimers();
+  });
+
+  it('does not retry non-429 errors', async () => {
+    seedLocalStorage({ accessToken: 'tok', expiresAt: Date.now() + 120_000 });
+    let calls = 0;
+    server.use(
+      http.get(`${TIDAL_API_BASE}/playlists`, () => {
+        calls++;
+        return new HttpResponse(null, { status: 401 });
+      }),
+    );
+    const result = await bg.tidalFetch(`${TIDAL_API_BASE}/playlists`);
+    expect(result).toEqual({ error: 'API error 401', status: 401 });
+    expect(calls).toBe(1);
+  });
+});
+
 describe('action.onClicked', () => {
   it('registers a listener that opens the options page', () => {
     expect(actionClickedHandler).toBeTypeOf('function');

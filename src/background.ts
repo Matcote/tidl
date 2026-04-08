@@ -229,23 +229,10 @@ async function fetchAllFavoriteIds(): Promise<string[]> {
   const MAX_PAGES = 200;
 
   while (url && pages < MAX_PAGES) {
-    let result: Record<string, unknown> | null = null;
+    const result = await tidalFetch(url) as Record<string, unknown>;
 
-    // Retry up to 3 times on rate limit, with increasing backoff
-    for (let attempt = 0; attempt < 3; attempt++) {
-      result = await tidalFetch(url) as Record<string, unknown>;
-      if ('status' in result && (result as { status?: number }).status === 429) {
-        const wait = (attempt + 1) * 3000; // 3s, 6s, 9s
-        console.warn(`[TidalID] Rate limited on favorites fetch, retrying in ${wait / 1000}s...`);
-        await new Promise(r => setTimeout(r, wait));
-        result = null;
-        continue;
-      }
-      break;
-    }
-
-    if (!result || 'error' in result) {
-      console.warn('[TidalID] Favorites fetch error:', result ? result.error : 'rate limit exhausted');
+    if ('error' in result) {
+      console.warn('[TidalID] Favorites fetch error:', result.error);
       break;
     }
 
@@ -307,27 +294,44 @@ export async function tidalFetch(
   url: string,
   options: RequestInit = {},
 ): Promise<SearchResponse | PlaylistsResponse | MutationResponse> {
-  const token = await getValidToken();
-  if (!token) return { error: 'Not authenticated' };
+  const MAX_ATTEMPTS = 3;
 
-  const res = await fetch(url, {
-    ...options,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/vnd.api+json',
-      Accept: 'application/vnd.api+json',
-      ...(options.headers ?? {}),
-    },
-  });
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    const token = await getValidToken();
+    if (!token) return { error: 'Not authenticated' };
 
-  if (!res.ok) {
-    return { error: `API error ${res.status}`, status: res.status };
+    const res = await fetch(url, {
+      ...options,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/vnd.api+json',
+        Accept: 'application/vnd.api+json',
+        ...(options.headers ?? {}),
+      },
+    });
+
+    if (res.status === 429) {
+      if (attempt === MAX_ATTEMPTS - 1) break;
+      const retryAfterRaw = parseInt(res.headers.get('Retry-After') ?? '', 10);
+      const wait = Number.isFinite(retryAfterRaw) && retryAfterRaw > 0
+        ? retryAfterRaw * 1000
+        : (attempt + 1) * 3000;
+      console.warn(`[TidalID] Rate limited, retrying in ${wait / 1000}s... (attempt ${attempt + 1}/${MAX_ATTEMPTS})`);
+      await new Promise(r => setTimeout(r, wait));
+      continue;
+    }
+
+    if (!res.ok) {
+      return { error: `API error ${res.status}`, status: res.status };
+    }
+
+    // Mutation endpoints may return 200, 201, 202, or 204 with no body
+    const text = await res.text();
+    if (!text) return { ok: true };
+    return JSON.parse(text) as SearchResponse | PlaylistsResponse | MutationResponse;
   }
 
-  // Mutation endpoints may return 200, 201, 202, or 204 with no body
-  const text = await res.text();
-  if (!text) return { ok: true };
-  return JSON.parse(text) as SearchResponse | PlaylistsResponse | MutationResponse;
+  return { error: 'API error 429', status: 429 };
 }
 
 // ─── Token Management ────────────────────────────────────────────────────────
