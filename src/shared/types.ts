@@ -46,4 +46,4 @@ export interface LocalStorage {
   favoritedTrackIds?: string[]; favoritesLastFetched?: number;
   playlistTrackMap?: Record<string, string[]>; playlistTracksFetched?: number;
 }
-export interface SessionStorage { tidalIdQuery?: string }
+export interface SessionStorage { tidlQuery?: string }

@@ -1,4 +1,4 @@
-// Tidal ID — Results Page
+// tIDl — Results Page
 
 import { extractTracks } from '../shared/tracks';
 import { escapeHtml, openTidalLink } from '../shared/utils';
@@ -25,17 +25,17 @@ const CHECK_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" w
 // ─── Init ─────────────────────────────────────────────────────────────────────
 
 async function init(): Promise<void> {
-  const stored = await chrome.storage.session.get('tidalIdQuery') as { tidalIdQuery?: string };
-  const { tidalIdQuery } = stored;
-  if (!tidalIdQuery) {
+  const stored = await chrome.storage.session.get('tidlQuery') as { tidlQuery?: string };
+  const { tidlQuery } = stored;
+  if (!tidlQuery) {
     showError('No search query found.');
     return;
   }
 
-  queryLabel.textContent = tidalIdQuery;
+  queryLabel.textContent = tidlQuery;
 
   const [searchResult, playlistResult] = await Promise.all([
-    chrome.runtime.sendMessage({ type: 'SEARCH', query: tidalIdQuery }) as Promise<SearchResponse>,
+    chrome.runtime.sendMessage({ type: 'SEARCH', query: tidlQuery }) as Promise<SearchResponse>,
     chrome.runtime.sendMessage({ type: 'GET_PLAYLISTS' }) as Promise<PlaylistsResponse>,
   ]);
 

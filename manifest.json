@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Tidal ID",
+  "name": "tIDl",
   "version": "0.1.0",
   "description": "Highlight text, search Tidal, add tracks to your favorites or playlists.",
   "permissions": ["contextMenus", "storage", "identity"],
@@ -28,7 +28,7 @@
     "128": "icons/icon128.png"
   },
   "action": {
-    "default_title": "Tidal ID",
+    "default_title": "tIDl",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",

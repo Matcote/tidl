@@ -1,6 +1,6 @@
 /* ─── Selection Popup Button ─────────────────────────────── */
 
-#tidal-id-popup {
+#tidl-popup {
   all: initial;
   position: absolute;
   z-index: 2147483647;
@@ -23,20 +23,20 @@
   transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
 }
 
-#tidal-id-popup:hover {
+#tidl-popup:hover {
   border-color: rgba(255, 255, 255, 0.35);
   background: #111111;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.08), 0 0 12px rgba(255, 255, 255, 0.12);
 }
 
-#tidal-id-popup svg {
+#tidl-popup svg {
   flex-shrink: 0;
   display: block;
 }
 
 /* ─── Inline Search Panel ────────────────────────────────── */
 
-#tidal-id-panel {
+#tidl-panel {
   all: initial;
   position: absolute;
   z-index: 2147483647;
@@ -62,7 +62,7 @@
     box-shadow 0.26s;
 }
 
-#tidal-id-panel.tidp-open {
+#tidl-panel.tidp-open {
   width: 400px;
   max-height: 540px;
   border-radius: 10px;
@@ -70,7 +70,7 @@
 }
 
 /* When placed above, panel grows upward from button's bottom edge */
-#tidal-id-panel.tidp-above {
+#tidl-panel.tidp-above {
   transform-origin: bottom center;
 }
 
@@ -97,7 +97,7 @@
   transition: opacity 0.18s 0.22s;
 }
 
-#tidal-id-panel.tidp-open .tidp-header {
+#tidl-panel.tidp-open .tidp-header {
   opacity: 1;
 }
 
@@ -184,7 +184,7 @@
 }
 .tidp-body::-webkit-scrollbar-thumb:hover { background: #3a3a3a; }
 
-#tidal-id-panel.tidp-open .tidp-body {
+#tidl-panel.tidp-open .tidp-body {
   opacity: 1;
 }
 

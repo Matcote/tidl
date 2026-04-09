@@ -9,7 +9,7 @@ import { addFavoriteInline, togglePlaylistPickerInline, isEditableTarget } from 
 
 function makePanel(): HTMLDivElement {
   const panel = document.createElement('div');
-  panel.id = 'tidal-id-panel';
+  panel.id = 'tidl-panel';
   panel.innerHTML = `
     <div class="tidp-inner">
       <div class="tidp-pl-picker tidp-hidden">

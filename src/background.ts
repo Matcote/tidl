@@ -1,4 +1,4 @@
-// Tidal ID — Background Service Worker
+// tIDl — Background Service Worker
 // Handles: context menu, OAuth token management, Tidal API calls
 
 import { TIDAL_TOKEN_URL, TIDAL_API_BASE, CLIENT_ID, CLIENT_SECRET } from './shared/constants';
@@ -17,7 +17,7 @@ import type {
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.removeAll(() => {
     chrome.contextMenus.create({
-      id: 'tidal-id-search',
+      id: 'tidl-search',
       title: 'Search in Tidal',
       contexts: ['selection'],
     });
@@ -29,7 +29,7 @@ chrome.action.onClicked.addListener(() => {
 });
 
 chrome.contextMenus.onClicked.addListener(async (info) => {
-  if (info.menuItemId !== 'tidal-id-search') return;
+  if (info.menuItemId !== 'tidl-search') return;
 
   const token = await getValidToken();
   if (!token) {
@@ -38,7 +38,7 @@ chrome.contextMenus.onClicked.addListener(async (info) => {
   }
 
   const query = (info.selectionText ?? '').trim();
-  await chrome.storage.session.set({ tidalIdQuery: query });
+  await chrome.storage.session.set({ tidlQuery: query });
 
   chrome.windows.create({
     url: chrome.runtime.getURL('results/results.html'),
@@ -85,7 +85,7 @@ async function openResults(query: string): Promise<void> {
     chrome.runtime.openOptionsPage();
     return;
   }
-  await chrome.storage.session.set({ tidalIdQuery: query.trim() });
+  await chrome.storage.session.set({ tidlQuery: query.trim() });
   chrome.windows.create({
     url: chrome.runtime.getURL('results/results.html'),
     type: 'popup',
@@ -102,7 +102,7 @@ export async function handleSearch(query: string): Promise<SearchResponse> {
   const encoded = encodeURIComponent(query);
   const url = `${TIDAL_API_BASE}/searchResults/${encoded}?countryCode=${countryCode}&include=tracks,tracks.artists,tracks.albums,tracks.albums.coverArt`;
   const result = await tidalFetch(url);
-  console.log('[TidalID] Search result:', JSON.stringify(result).slice(0, 500));
+  console.log('[tidl] Search result:', JSON.stringify(result).slice(0, 500));
   return result as SearchResponse;
 }
 
@@ -111,7 +111,7 @@ export async function handleGetPlaylists(): Promise<PlaylistsResponse> {
   const countryCode = stored.countryCode ?? 'CA';
   const url = `${TIDAL_API_BASE}/playlists?filter[owners.id]=me&countryCode=${countryCode}`;
   const result = await tidalFetch(url) as PlaylistsResponse;
-  console.log('[TidalID] Playlists result:', JSON.stringify(result).slice(0, 500));
+  console.log('[tidl] Playlists result:', JSON.stringify(result).slice(0, 500));
   return result;
 }
 
@@ -160,7 +160,7 @@ export async function handleGetPlaylistTracks(playlistIds: string[]): Promise<Pl
     await chrome.storage.local.set({ playlistTrackMap: trackMap, playlistTracksFetched: Date.now() });
     return { trackMap };
   } catch (err) {
-    console.error('[TidalID] Failed to fetch playlist tracks:', err);
+    console.error('[tidl] Failed to fetch playlist tracks:', err);
     return { trackMap: {} };
   }
 }
@@ -232,7 +232,7 @@ async function fetchAllFavoriteIds(): Promise<string[]> {
     const result = await tidalFetch(url) as Record<string, unknown>;
 
     if ('error' in result) {
-      console.warn('[TidalID] Favorites fetch error:', result.error);
+      console.warn('[tidl] Favorites fetch error:', result.error);
       break;
     }
 
@@ -283,7 +283,7 @@ async function handleGetFavorites(): Promise<FavoritesResponse> {
     const trackIds = await fetchAllFavoriteIds();
     return { trackIds };
   } catch (err) {
-    console.error('[TidalID] Failed to fetch favorites:', err);
+    console.error('[tidl] Failed to fetch favorites:', err);
     return { trackIds: [] };
   }
 }
@@ -316,7 +316,7 @@ export async function tidalFetch(
       const wait = Number.isFinite(retryAfterRaw) && retryAfterRaw > 0
         ? retryAfterRaw * 1000
         : (attempt + 1) * 3000;
-      console.warn(`[TidalID] Rate limited, retrying in ${wait / 1000}s... (attempt ${attempt + 1}/${MAX_ATTEMPTS})`);
+      console.warn(`[tidl] Rate limited, retrying in ${wait / 1000}s... (attempt ${attempt + 1}/${MAX_ATTEMPTS})`);
       await new Promise(r => setTimeout(r, wait));
       continue;
     }

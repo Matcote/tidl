@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Tidal ID** is a Chrome browser extension (Manifest V3) that lets users highlight text on any webpage to search Tidal and manage their music library (favorites, playlists) inline.
+**tIDl** is a Chrome browser extension (Manifest V3) that lets users highlight text on any webpage to search Tidal and manage their music library (favorites, playlists) inline.
 
 ## Development
 
@@ -52,7 +52,7 @@ Handles all privileged operations:
 
 ### Message Protocol
 Content script → background: `{ type: "SEARCH" | "GET_PLAYLISTS" | "ADD_FAVORITE" | "ADD_TO_PLAYLIST" | "OPEN_RESULTS" | "STORE_TOKENS", ... }` (typed as `ExtensionMessage` discriminated union in `src/shared/types.ts`)
-Background stores transient search queries in `chrome.storage.session` key `tidalIdQuery` for the results popup to pick up.
+Background stores transient search queries in `chrome.storage.session` key `tidlQuery` for the results popup to pick up.
 
 ### Chrome Storage Keys
 | Key | Purpose |

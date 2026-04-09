@@ -1,4 +1,4 @@
-// Tidal ID — Options Page
+// tIDl — Options Page
 
 import { TIDAL_AUTH_URL, TIDAL_TOKEN_URL, SCOPES, CLIENT_ID, CLIENT_SECRET } from '../shared/constants';
 import type { OAuthTokenResponse } from '../shared/types';
@@ -58,7 +58,7 @@ export async function fetchUserProfile(accessToken: string): Promise<string | nu
     });
     if (!res.ok) return null;
     const json = await res.json() as MeResponse;
-    console.log('[TidalID] /me response:', JSON.stringify(json));
+    console.log('[tidl] /me response:', JSON.stringify(json));
 
     // Try display name / full name / username directly on the user object
     const attrs = json?.data?.attributes;
@@ -74,7 +74,7 @@ export async function fetchUserProfile(accessToken: string): Promise<string | nu
       });
       if (artistRes.ok) {
         const artistJson = await artistRes.json() as ArtistResponse;
-        console.log('[TidalID] /artists response:', JSON.stringify(artistJson));
+        console.log('[tidl] /artists response:', JSON.stringify(artistJson));
         return artistJson?.data?.attributes?.name || null;
       }
     }
@@ -104,8 +104,8 @@ connectBtn.addEventListener('click', async () => {
   });
 
   const fullAuthUrl = `${TIDAL_AUTH_URL}?${authParams}`;
-  console.log('[TidalID] Auth URL:', fullAuthUrl);
-  console.log('[TidalID] Redirect URI:', redirectUri);
+  console.log('[tidl] Auth URL:', fullAuthUrl);
+  console.log('[tidl] Redirect URI:', redirectUri);
 
   let redirectUrl: string | undefined;
   try {
@@ -114,7 +114,7 @@ connectBtn.addEventListener('click', async () => {
       interactive: true,
     });
   } catch (err) {
-    console.error('[TidalID] launchWebAuthFlow error:', err);
+    console.error('[tidl] launchWebAuthFlow error:', err);
     showMessage(`Auth failed: ${err instanceof Error ? err.message : String(err)}`, true);
     return;
   }
@@ -175,7 +175,7 @@ connectBtn.addEventListener('click', async () => {
       username = payload.username || payload.usr || fullName || payload.email || username;
       countryCode = payload.cc ?? countryCode;
     } catch (e) {
-      console.warn('[TidalID] JWT decode failed:', e);
+      console.warn('[tidl] JWT decode failed:', e);
     }
   }
 

@@ -1,6 +1,6 @@
-# Tidal ID
+# tIDl
 
-A Chrome extension that lets you highlight text on any webpage to instantly search Tidal and manage your music library — add favorites, manage playlists — without leaving the page.
+A Chrome extension for identifying tracks from DJ sets. Highlight text on any webpage to instantly search Tidal and manage your music library — add favorites, manage playlists — without leaving the page.
 
 ## Features
 
