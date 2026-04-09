@@ -1,7 +1,27 @@
+:root {
+  --bg:         #0a0a0a;
+  --surface:    #0d0d0d;
+  --surface-2:  #161616;
+  --border:     #2a2a2a;
+  --border-hi:  #333;
+  --accent:     #00FFFF;
+  --text:       #ffffff;
+  --text-2:     #e8e8e8;
+  --text-3:     #999;
+  --text-4:     #888;
+  --text-5:     #777;
+  --text-6:     #666;
+  --green:      #22c55e;
+  --red:        #ff4d6a;
+  --amber:      #f59e0b;
+  --error:      #f87171;
+  --font:       'Chakra Petch', system-ui, sans-serif;
+}
+
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: 'Chakra Petch', system-ui, sans-serif;
   background: #0a0a0a;
   color: #e8e8e8;
   width: 500px;
@@ -13,7 +33,7 @@ header {
   align-items: center;
   gap: 10px;
   padding: 14px 16px;
-  border-bottom: 1px solid #1f1f1f;
+  border-bottom: 1px solid #1a1a1a;
   position: sticky;
   top: 0;
   background: #0a0a0a;
@@ -21,21 +41,22 @@ header {
 }
 
 .logo {
-  font-weight: 700;
-  font-size: 15px;
+  font-weight: 500;
+  font-size: 14px;
   color: #00FFFF;
   flex-shrink: 0;
+  letter-spacing: 0.05em;
 }
 
 .query {
-  font-size: 13px;
-  color: #666;
+  font-size: 11px;
+  color: #888;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.query::before { content: '→ '; }
+.query::before { content: '→ '; color: #666; }
 
 /* ─── States ─────────────────────────────────────── */
 
@@ -44,74 +65,106 @@ header {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: 14px;
   padding: 60px 16px;
-  color: #555;
-  font-size: 14px;
+  color: #888;
+  font-size: 12px;
+  letter-spacing: 0.05em;
 }
 
 #settings-btn {
-  padding: 7px 18px;
-  border-radius: 6px;
-  font-size: 13px;
-  font-weight: 600;
+  padding: 6px 16px;
+  border-radius: 0;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 500;
   cursor: pointer;
   border: 1px solid #00FFFF;
   color: #00FFFF;
   background: transparent;
   transition: background 0.15s;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
 }
 
-#settings-btn:hover { background: rgba(0, 255, 255, 0.1); }
+#settings-btn:hover { background: rgba(0, 255, 255, 0.08); }
 
-.spinner {
-  width: 28px;
-  height: 28px;
-  border: 2px solid #222;
-  border-top-color: #00FFFF;
-  border-radius: 50%;
-  animation: spin 0.7s linear infinite;
+/* ─── Loading — Waveform ─────────────────────────── */
+
+.waveform {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 22px;
 }
 
-@keyframes spin { to { transform: rotate(360deg); } }
+.waveform span {
+  display: block;
+  width: 3px;
+  height: 3px;
+  background: #00FFFF;
+  animation: wave-bar 1s ease-in-out infinite;
+}
+
+.waveform span:nth-child(1) { animation-delay: 0s; }
+.waveform span:nth-child(2) { animation-delay: 0.15s; }
+.waveform span:nth-child(3) { animation-delay: 0.30s; }
+.waveform span:nth-child(4) { animation-delay: 0.45s; }
+.waveform span:nth-child(5) { animation-delay: 0.60s; }
+
+@keyframes wave-bar {
+  0%, 100% { height: 3px; }
+  50%       { height: 20px; }
+}
 
 /* ─── Track List ─────────────────────────────────── */
 
 #results-list {
   list-style: none;
-  padding: 8px 0;
+  padding: 6px 0;
   max-height: calc(100vh - 56px);
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: #2a2a2a transparent;
 }
 
-#results-list::-webkit-scrollbar { width: 6px; }
+#results-list::-webkit-scrollbar { width: 4px; }
 #results-list::-webkit-scrollbar-track { background: transparent; }
 #results-list::-webkit-scrollbar-thumb {
   background: #2a2a2a;
-  border-radius: 3px;
+  border-radius: 0;
 }
-#results-list::-webkit-scrollbar-thumb:hover { background: #3a3a3a; }
+#results-list::-webkit-scrollbar-thumb:hover { background: #00FFFF; }
 
 .track-item {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 16px;
+  padding: 10px 16px 10px 14px;
   border-bottom: 1px solid #141414;
-  transition: background 0.1s;
+  border-left: 2px solid transparent;
+  transition: border-color 0.1s, background 0.1s;
+  animation: track-in 0.22s ease-out both;
+  animation-delay: calc(var(--i, 0) * 35ms);
 }
 
-.track-item:hover { background: #111; }
+.track-item:hover {
+  border-left-color: #00FFFF;
+  background: #0d0d0d;
+}
+
+@keyframes track-in {
+  from { opacity: 0; transform: translateX(-8px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
 
 .track-art {
   width: 44px;
   height: 44px;
-  border-radius: 6px;
+  border-radius: 2px;
   object-fit: cover;
   flex-shrink: 0;
-  background: #1a1a1a;
+  background: #161616;
 }
 
 .track-info {
@@ -120,7 +173,7 @@ header {
 }
 
 .track-title {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
   color: #fff;
   white-space: nowrap;
@@ -129,9 +182,9 @@ header {
 }
 
 .track-artist {
-  font-size: 12px;
-  color: #777;
-  margin-top: 2px;
+  font-size: 11px;
+  color: #999;
+  margin-top: 3px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -143,21 +196,23 @@ header {
 }
 
 .track-link:hover {
+  color: #00FFFF;
   text-decoration: underline;
-  text-underline-offset: 2px;
+  text-underline-offset: 3px;
 }
 
 .track-duration {
   font-size: 11px;
-  color: #555;
+  color: #777;
   flex-shrink: 0;
+  margin-left: auto;
 }
 
 /* ─── Action Buttons ─────────────────────────────── */
 
 .track-actions {
   display: flex;
-  gap: 6px;
+  gap: 2px;
   flex-shrink: 0;
   align-items: center;
 }
@@ -166,13 +221,13 @@ header {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   cursor: pointer;
   border: none;
   background: transparent;
-  color: rgba(255, 255, 255, 0.35);
+  color: rgba(255, 255, 255, 0.4);
   transition: color 0.15s, filter 0.15s;
   flex-shrink: 0;
   padding: 0;
@@ -186,8 +241,8 @@ header {
 }
 
 .btn-fav:hover {
-  color: rgba(255, 255, 255, 0.9);
-  filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.5));
+  color: rgba(255, 255, 255, 0.85);
+  filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.4));
 }
 
 .btn-fav.favorited {
@@ -208,7 +263,6 @@ header {
 }
 
 .btn-fav:disabled {
-  opacity: 0.4;
   cursor: default;
 }
 
@@ -222,13 +276,13 @@ header {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   cursor: pointer;
   border: none;
   background: transparent;
-  color: rgba(255, 255, 255, 0.35);
+  color: rgba(255, 255, 255, 0.4);
   transition: color 0.15s, filter 0.15s;
   flex-shrink: 0;
   padding: 0;
@@ -241,8 +295,8 @@ header {
 }
 
 .btn-playlist:hover {
-  color: rgba(255, 255, 255, 0.9);
-  filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.5));
+  color: rgba(255, 255, 255, 0.85);
+  filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.4));
 }
 
 .btn-playlist.added {
@@ -259,7 +313,7 @@ header {
 }
 
 .btn-playlist:disabled {
-  opacity: 0.4;
+  opacity: 0.3;
   cursor: default;
 }
 
@@ -267,10 +321,10 @@ header {
 
 #playlist-picker {
   position: fixed;
-  background: #1a1a1a;
+  background: #0f0f0f;
   border: 1px solid #2a2a2a;
-  border-radius: 10px;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+  border-radius: 0;
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.6);
   min-width: 220px;
   max-height: 260px;
   overflow-y: auto;
@@ -278,11 +332,11 @@ header {
 }
 
 .picker-header {
-  font-size: 11px;
-  font-weight: 600;
-  color: #555;
+  font-size: 10px;
+  font-weight: 500;
+  color: #777;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.08em;
   padding: 10px 14px 6px;
 }
 
@@ -293,23 +347,26 @@ header {
 
 #playlist-list li {
   padding: 8px 14px;
-  font-size: 13px;
-  color: #ccc;
+  font-size: 11px;
+  color: #aaa;
   cursor: pointer;
-  transition: background 0.1s;
+  border-left: 2px solid transparent;
+  transition: background 0.1s, border-color 0.1s, color 0.1s;
 }
 
-#playlist-list li:hover { background: #222; color: #fff; }
+#playlist-list li:hover { background: #161616; color: #fff; border-left-color: #00FFFF; }
 
 #playlist-list li.pl-added {
   color: #22c55e;
   display: flex;
   align-items: center;
   gap: 6px;
+  border-left-color: transparent;
 }
 #playlist-list li.pl-added:hover {
   background: transparent;
   color: #22c55e;
+  border-left-color: transparent;
 }
 .pl-check {
   font-size: 12px;

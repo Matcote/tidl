@@ -28,7 +28,7 @@ const entryPoints = [
 ];
 
 function copyStaticAssets() {
-  ['dist/options', 'dist/results', 'dist/icons'].forEach(d => fs.mkdirSync(d, { recursive: true }));
+  ['dist/options', 'dist/results', 'dist/icons', 'dist/fonts'].forEach(d => fs.mkdirSync(d, { recursive: true }));
   [
     ['options/options.html', 'dist/options/options.html'],
     ['options/options.css',  'dist/options/options.css'],
@@ -38,6 +38,7 @@ function copyStaticAssets() {
     ['manifest.json',        'dist/manifest.json'],
   ].forEach(([src, dst]) => fs.copyFileSync(src, dst));
   fs.cpSync('icons', 'dist/icons', { recursive: true });
+  fs.cpSync('fonts', 'dist/fonts', { recursive: true });
 }
 
 async function build() {
@@ -69,6 +70,10 @@ async function build() {
         copyStaticAssets();
       });
     }
+    fs.watch('fonts', { recursive: true }, () => {
+      console.log('[static] fonts changed, copying...');
+      copyStaticAssets();
+    });
   } else {
     await ctx.rebuild();
     await ctx.dispose();

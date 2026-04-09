@@ -13,12 +13,20 @@ let panelActivePlBtn: HTMLButtonElement | null = null;
 let panelPlaylistTrackMap: Record<string, string[]> = {};
 const panelAddedMap = new Map<string, Set<string>>();
 
-const PANEL_WIDTH = 400;
-const PANEL_HEIGHT = 540;
+// Playlist picker lives on document.body so position:fixed isn't clipped by
+// the panel's CSS transform.
+const plPicker = document.createElement('div');
+plPicker.className = 'tidp-pl-picker tidp-hidden';
+plPicker.innerHTML = '<div class="tidp-pl-header">Add to playlist</div><ul class="tidp-pl-list"></ul>';
+document.documentElement.appendChild(plPicker);
+const plPickerList = plPicker.querySelector('.tidp-pl-list') as HTMLElement;
 
-const HEART_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>`;
-const PLUS_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`;
-const CHECK_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>`;
+const PANEL_WIDTH = 400;
+const PANEL_HEIGHT = 337;
+
+const HEART_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>`;
+const PLUS_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`;
+const CHECK_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>`;
 
 // ─── Cleanup ──────────────────────────────────────────────────────────────────
 
@@ -34,8 +42,9 @@ function removePanel(): void {
     tidalPanel.remove();
     tidalPanel = null;
   }
-  panelPlaylists = [];
+  plPicker.classList.add('tidp-hidden');
   panelActivePlBtn = null;
+  panelPlaylists = [];
   panelPlaylistTrackMap = {};
   panelAddedMap.clear();
 }
@@ -218,18 +227,14 @@ function openSearchPanel(
       </div>
       <div class="tidp-body">
         <div class="tidp-loading">
-          <div class="tidp-spinner"></div>
+          <div class="tidp-waveform"><span></span><span></span><span></span><span></span><span></span></div>
         </div>
         <ul class="tidp-results tidp-hidden"></ul>
         <div class="tidp-empty tidp-hidden">No tracks found.</div>
         <div class="tidp-error tidp-hidden"></div>
-        <div class="tidp-pl-picker tidp-hidden">
-          <div class="tidp-pl-header">Add to playlist</div>
-          <ul class="tidp-pl-list"></ul>
-        </div>
       </div>
       <div class="tidp-body-overlay tidp-hidden">
-        <div class="tidp-spinner"></div>
+        <div class="tidp-waveform"><span></span><span></span><span></span><span></span><span></span></div>
       </div>
     </div>
   `;
@@ -267,7 +272,7 @@ function openSearchPanel(
       !target.closest('.tidp-pl-picker') &&
       !target.closest('.tidp-btn-pl')
     ) {
-      tidalPanel?.querySelector('.tidp-pl-picker')?.classList.add('tidp-hidden');
+      plPicker.classList.add('tidp-hidden');
       panelActivePlBtn = null;
     }
   });
@@ -279,8 +284,6 @@ function openSearchPanel(
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
       tidalPanel?.classList.add('tidp-open');
-      // Lock loading-state height so revealBody has a stable start point
-      bodyEl.style.height = `${bodyEl.clientHeight}px`;
     });
   });
 
@@ -291,26 +294,7 @@ function openSearchPanel(
 
 function revealBody(bodyEl?: HTMLElement, overlay?: HTMLElement): void {
   if (!bodyEl || !overlay) return;
-  const fromH = bodyEl.clientHeight;
-  const toH = Math.min(bodyEl.scrollHeight, 496);
   overlay.classList.add('tidp-hidden');
-  bodyEl.style.overflowY = 'hidden';
-  // Commit explicit start height with no transition, then animate in next frame
-  bodyEl.style.transition = 'none';
-  bodyEl.style.height = `${fromH}px`;
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
-      bodyEl.style.transition = 'height 0.22s ease';
-      bodyEl.style.height = `${toH}px`;
-      setTimeout(() => {
-        if (tidalPanel) {
-          bodyEl.style.transition = '';
-          bodyEl.style.height = '';
-          bodyEl.style.overflowY = '';
-        }
-      }, 240);
-    });
-  });
 }
 
 async function doSearch(query: string, bodyEl?: HTMLElement, overlay?: HTMLElement): Promise<void> {
@@ -383,9 +367,10 @@ async function doSearch(query: string, bodyEl?: HTMLElement, overlay?: HTMLEleme
 function renderTracks(tracks: Track[], listEl: HTMLUListElement): void {
   listEl.innerHTML = '';
 
-  for (const track of tracks) {
+  for (const [i, track] of tracks.entries()) {
     const li = document.createElement('li');
     li.className = 'tidp-track';
+    li.style.setProperty('--i', String(i));
 
     const img = document.createElement('img');
     img.className = 'tidp-art';
@@ -486,23 +471,20 @@ export function togglePlaylistPickerInline(
 ): void {
   if (!tidalPanel) return;
 
-  const picker = tidalPanel.querySelector('.tidp-pl-picker') as HTMLElement;
-  const listEl = tidalPanel.querySelector('.tidp-pl-list') as HTMLElement;
-
   if (!panelPlaylists.length) {
     btn.classList.add('tidp-btn-pl-empty');
     setTimeout(() => { btn.classList.remove('tidp-btn-pl-empty'); }, 2000);
     return;
   }
 
-  if (panelActivePlBtn === btn && !picker.classList.contains('tidp-hidden')) {
-    picker.classList.add('tidp-hidden');
+  if (panelActivePlBtn === btn && !plPicker.classList.contains('tidp-hidden')) {
+    plPicker.classList.add('tidp-hidden');
     panelActivePlBtn = null;
     return;
   }
 
   panelActivePlBtn = btn;
-  listEl.innerHTML = '';
+  plPickerList.innerHTML = '';
 
   for (const playlist of panelPlaylists) {
     const alreadyIn = (panelPlaylistTrackMap[playlist.id]?.includes(trackId) ?? false)
@@ -515,7 +497,7 @@ export function togglePlaylistPickerInline(
       li.textContent = playlist.name;
     }
     li.addEventListener('click', async () => {
-      picker.classList.add('tidp-hidden');
+      plPicker.classList.add('tidp-hidden');
       panelActivePlBtn = null;
       btn.disabled = true;
       const result = (await chrome.runtime.sendMessage({
@@ -537,13 +519,13 @@ export function togglePlaylistPickerInline(
         }, 1500);
       }
     });
-    listEl.appendChild(li);
+    plPickerList.appendChild(li);
   }
 
-  // Position picker near button, relative to the panel's inner element
+  // Position picker near button, fixed to the viewport
   const btnRect = btn.getBoundingClientRect();
-  const innerRect = tidalPanel.querySelector('.tidp-inner')!.getBoundingClientRect();
-  picker.style.top = `${btnRect.bottom - innerRect.top + 4}px`;
-  picker.style.right = `${innerRect.right - btnRect.right}px`;
-  picker.classList.remove('tidp-hidden');
+  plPicker.style.top = `${btnRect.bottom + 4}px`;
+  plPicker.style.right = `${window.innerWidth - btnRect.right}px`;
+  document.documentElement.appendChild(plPicker); // ensure it's last in DOM so it stacks above the panel
+  plPicker.classList.remove('tidp-hidden');
 }

@@ -59,12 +59,13 @@ describe('addFavorite', () => {
     await p;
   });
 
-  it('adds favorited class on success', async () => {
+  it('adds favorited class on success and re-enables button', async () => {
     (chrome.runtime.sendMessage as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true });
     const btn = makeButton();
     await addFavorite('track-1', btn);
     expect(btn.classList.contains('favorited')).toBe(true);
     expect(btn.getAttribute('aria-label')).toBe('Favorited');
+    expect(btn.disabled).toBe(false);
   });
 
   it('re-enables button on error', async () => {

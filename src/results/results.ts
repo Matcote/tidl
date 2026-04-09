@@ -18,9 +18,9 @@ let activePlBtn: HTMLButtonElement | null = null;
 let playlistTrackMap: Record<string, string[]> = {};
 const addedMap = new Map<string, Set<string>>();
 
-const HEART_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>`;
-const PLUS_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`;
-const CHECK_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>`;
+const HEART_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>`;
+const PLUS_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`;
+const CHECK_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>`;
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 
@@ -80,9 +80,10 @@ async function init(): Promise<void> {
 function renderTracks(tracks: Track[]): void {
   resultsList.innerHTML = '';
 
-  for (const track of tracks) {
+  for (const [i, track] of tracks.entries()) {
     const li = document.createElement('li');
     li.className = 'track-item';
+    li.style.setProperty('--i', String(i));
 
     const img = document.createElement('img');
     img.className = 'track-art';
@@ -171,6 +172,7 @@ export async function addFavorite(trackId: string, btn: HTMLButtonElement): Prom
   if (result?.error) {
     btn.disabled = false;
   } else {
+    btn.disabled = false;
     btn.classList.add('favorited');
     btn.setAttribute('aria-label', 'Favorited');
   }
