@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "build": "node build.js",
+    "package": "npm run build && cd dist && zip -r ../tidl-$npm_package_version.zip .",
     "watch": "node build.js --watch",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
