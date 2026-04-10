@@ -75,7 +75,7 @@ document.addEventListener('mousedown', (e) => {
 
   // Dismiss popup/panel when clicking outside them
   if (tidalPopupBtn && e.target instanceof Node && !tidalPopupBtn.contains(e.target)) removePopup();
-  if (tidalPanel && e.target instanceof Node && !tidalPanel.contains(e.target)) removePanel();
+  if (tidalPanel && e.target instanceof Node && !tidalPanel.contains(e.target) && !plPicker.contains(e.target)) removePanel();
 });
 
 document.addEventListener('mouseup', (e) => {
