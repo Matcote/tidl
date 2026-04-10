@@ -121,7 +121,7 @@ function renderTracks(tracks: Track[]): void {
     favBtn.dataset['trackId'] = track.id;
     favBtn.innerHTML = HEART_SVG;
     favBtn.setAttribute('aria-label', 'Add to favorites');
-    favBtn.addEventListener('click', () => addFavorite(track.id, favBtn));
+    favBtn.addEventListener('click', () => toggleFavorite(track.id, favBtn));
 
     const plBtn = document.createElement('button');
     plBtn.className = 'btn-playlist';
@@ -163,18 +163,27 @@ function markFavoritedButtons(favIds: Set<string>): void {
 
 // ─── Actions ──────────────────────────────────────────────────────────────────
 
-export async function addFavorite(trackId: string, btn: HTMLButtonElement): Promise<void> {
-  if (btn.classList.contains('favorited')) return;
+export async function toggleFavorite(trackId: string, btn: HTMLButtonElement): Promise<void> {
+  const isFavorited = btn.classList.contains('favorited');
   btn.disabled = true;
-
-  const result = (await chrome.runtime.sendMessage({ type: 'ADD_FAVORITE', trackId })) as { error?: string };
-
-  if (result?.error) {
-    btn.disabled = false;
+  if (isFavorited) {
+    const result = (await chrome.runtime.sendMessage({ type: 'REMOVE_FAVORITE', trackId })) as { error?: string };
+    if (result?.error) {
+      btn.disabled = false;
+    } else {
+      btn.classList.remove('favorited');
+      btn.setAttribute('aria-label', 'Add to favorites');
+      btn.disabled = false;
+    }
   } else {
-    btn.disabled = false;
-    btn.classList.add('favorited');
-    btn.setAttribute('aria-label', 'Favorited');
+    const result = (await chrome.runtime.sendMessage({ type: 'ADD_FAVORITE', trackId })) as { error?: string };
+    if (result?.error) {
+      btn.disabled = false;
+    } else {
+      btn.disabled = false;
+      btn.classList.add('favorited');
+      btn.setAttribute('aria-label', 'Favorited');
+    }
   }
 }
 
@@ -212,24 +221,28 @@ export function togglePlaylistPicker(e: MouseEvent, trackId: string, btn: HTMLBu
       activePlBtn = null;
       btn.disabled = true;
 
-      const result = (await chrome.runtime.sendMessage({
-        type: 'ADD_TO_PLAYLIST',
-        trackId,
-        playlistId: playlist.id,
-      })) as { error?: string };
+      try {
+        const result = (await chrome.runtime.sendMessage({
+          type: 'ADD_TO_PLAYLIST',
+          trackId,
+          playlistId: playlist.id,
+        })) as { error?: string };
 
-      if (result?.error) {
-        btn.disabled = false;
-      } else {
-        if (!addedMap.has(trackId)) addedMap.set(trackId, new Set());
-        addedMap.get(trackId)!.add(playlist.id);
-        btn.innerHTML = CHECK_SVG;
-        btn.classList.add('added');
-        setTimeout(() => {
-          btn.innerHTML = PLUS_SVG;
-          btn.classList.remove('added');
+        if (result?.error) {
           btn.disabled = false;
-        }, 1500);
+        } else {
+          if (!addedMap.has(trackId)) addedMap.set(trackId, new Set());
+          addedMap.get(trackId)!.add(playlist.id);
+          btn.innerHTML = CHECK_SVG;
+          btn.classList.add('added');
+          setTimeout(() => {
+            btn.innerHTML = PLUS_SVG;
+            btn.classList.remove('added');
+            btn.disabled = false;
+          }, 1500);
+        }
+      } catch {
+        btn.disabled = false;
       }
     });
     playlistList.appendChild(li);

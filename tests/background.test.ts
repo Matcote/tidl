@@ -252,6 +252,57 @@ describe('handleAddFavorite', () => {
   });
 });
 
+describe('handleRemoveFavorite', () => {
+  it('DELETEs to correct endpoint with correct body', async () => {
+    seedLocalStorage({ accessToken: 'tok', expiresAt: Date.now() + 120_000, userId: 'u123', countryCode: 'US' });
+
+    let capturedMethod: string | undefined;
+    let capturedUrl: string | undefined;
+    let capturedBody: unknown;
+    server.use(
+      http.delete(`${TIDAL_API_BASE}/userCollections/:userId/relationships/tracks`, async ({ request }) => {
+        capturedMethod = request.method;
+        capturedUrl = request.url;
+        capturedBody = await request.json();
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+
+    const result = await bg.handleRemoveFavorite('track-1');
+    expect(capturedMethod).toBe('DELETE');
+    expect(capturedUrl).toContain('/userCollections/u123/relationships/tracks');
+    expect(capturedBody).toEqual({ data: [{ id: 'track-1', type: 'tracks' }] });
+    expect(result).toEqual({ ok: true });
+  });
+
+  it('removes trackId from favoritedTrackIds cache on success', async () => {
+    seedLocalStorage({
+      accessToken: 'tok', expiresAt: Date.now() + 120_000, userId: 'u123',
+      favoritedTrackIds: ['track-1', 'track-2', 'track-3'],
+    });
+
+    await bg.handleRemoveFavorite('track-2');
+
+    expect(getLocalStore()['favoritedTrackIds']).toEqual(['track-1', 'track-3']);
+  });
+
+  it('does not mutate cache when API returns an error', async () => {
+    seedLocalStorage({
+      accessToken: 'tok', expiresAt: Date.now() + 120_000, userId: 'u123',
+      favoritedTrackIds: ['track-1', 'track-2'],
+    });
+    server.use(
+      http.delete(`${TIDAL_API_BASE}/userCollections/:userId/relationships/tracks`, () =>
+        new HttpResponse(null, { status: 500 }),
+      ),
+    );
+
+    await bg.handleRemoveFavorite('track-1');
+
+    expect(getLocalStore()['favoritedTrackIds']).toEqual(['track-1', 'track-2']);
+  });
+});
+
 describe('handleAddToPlaylist', () => {
   it('POSTs to correct endpoint with correct body', async () => {
     seedLocalStorage({ accessToken: 'tok', expiresAt: Date.now() + 120_000 });

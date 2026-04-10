@@ -410,7 +410,7 @@ function renderTracks(tracks: Track[], listEl: HTMLUListElement): void {
     favBtn.setAttribute('aria-label', 'Add to favorites');
     favBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      addFavoriteInline(track.id, favBtn);
+      toggleFavoriteInline(track.id, favBtn);
     });
 
     const plBtn = document.createElement('button');
@@ -452,15 +452,27 @@ function markFavoritedButtons(listEl: HTMLUListElement, favIds: Set<string>): vo
 
 // ─── Actions ──────────────────────────────────────────────────────────────────
 
-export async function addFavoriteInline(trackId: string, btn: HTMLButtonElement): Promise<void> {
-  if (btn.classList.contains('favorited')) return;
+export async function toggleFavoriteInline(trackId: string, btn: HTMLButtonElement): Promise<void> {
+  const isFavorited = btn.classList.contains('favorited');
   btn.disabled = true;
-  const result = (await chrome.runtime.sendMessage({ type: 'ADD_FAVORITE', trackId })) as { error?: string };
-  if (result?.error) {
-    btn.disabled = false;
+  if (isFavorited) {
+    const result = (await chrome.runtime.sendMessage({ type: 'REMOVE_FAVORITE', trackId })) as { error?: string };
+    if (result?.error) {
+      btn.disabled = false;
+    } else {
+      btn.classList.remove('favorited');
+      btn.setAttribute('aria-label', 'Add to favorites');
+      btn.disabled = false;
+    }
   } else {
-    btn.classList.add('favorited');
-    btn.setAttribute('aria-label', 'Favorited');
+    const result = (await chrome.runtime.sendMessage({ type: 'ADD_FAVORITE', trackId })) as { error?: string };
+    if (result?.error) {
+      btn.disabled = false;
+    } else {
+      btn.classList.add('favorited');
+      btn.setAttribute('aria-label', 'Favorited');
+      btn.disabled = false;
+    }
   }
 }
 

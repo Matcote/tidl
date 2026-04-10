@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { addFavoriteInline, togglePlaylistPickerInline, isEditableTarget } from '../src/content';
+import { toggleFavoriteInline, togglePlaylistPickerInline, isEditableTarget } from '../src/content';
 
 // panelPlaylists and tidalPanel are module-level in content.ts.
 // We test the exported functions directly, providing a panel fixture.
@@ -32,11 +32,11 @@ beforeEach(() => {
   document.body.innerHTML = '';
 });
 
-describe('addFavoriteInline', () => {
+describe('toggleFavoriteInline', () => {
   it('immediately disables button on click', async () => {
     (chrome.runtime.sendMessage as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true });
     const btn = makeButton();
-    const p = addFavoriteInline('track-1', btn);
+    const p = toggleFavoriteInline('track-1', btn);
     expect(btn.disabled).toBe(true);
     await p;
   });
@@ -44,7 +44,7 @@ describe('addFavoriteInline', () => {
   it('adds favorited class on success', async () => {
     (chrome.runtime.sendMessage as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true });
     const btn = makeButton();
-    await addFavoriteInline('track-1', btn);
+    await toggleFavoriteInline('track-1', btn);
     expect(btn.classList.contains('favorited')).toBe(true);
     expect(btn.getAttribute('aria-label')).toBe('Favorited');
   });
@@ -52,18 +52,22 @@ describe('addFavoriteInline', () => {
   it('re-enables button on error', async () => {
     (chrome.runtime.sendMessage as ReturnType<typeof vi.fn>).mockResolvedValue({ error: 'Not authenticated' });
     const btn = makeButton();
-    await addFavoriteInline('track-1', btn);
+    await toggleFavoriteInline('track-1', btn);
     expect(btn.classList.contains('favorited')).toBe(false);
     expect(btn.disabled).toBe(false);
   });
 
-  it('does nothing on second call when button already has added class', async () => {
+  it('sends REMOVE_FAVORITE and removes favorited class on second call', async () => {
     (chrome.runtime.sendMessage as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true });
     const btn = makeButton();
-    await addFavoriteInline('track-1', btn);
-    vi.clearAllMocks();
-    await addFavoriteInline('track-1', btn);
-    expect(chrome.runtime.sendMessage).not.toHaveBeenCalled();
+    await toggleFavoriteInline('track-1', btn);
+    expect(btn.classList.contains('favorited')).toBe(true);
+    const sendMock = chrome.runtime.sendMessage as ReturnType<typeof vi.fn>;
+    sendMock.mockClear();
+    await toggleFavoriteInline('track-1', btn);
+    expect(sendMock).toHaveBeenCalledWith({ type: 'REMOVE_FAVORITE', trackId: 'track-1' });
+    expect(btn.classList.contains('favorited')).toBe(false);
+    expect(btn.getAttribute('aria-label')).toBe('Add to favorites');
   });
 });
 

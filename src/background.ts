@@ -67,6 +67,9 @@ chrome.runtime.onMessage.addListener((msg: ExtensionMessage, _sender, sendRespon
     case 'ADD_FAVORITE':
       handleAddFavorite(msg.trackId).then(sendResponse, (err) => sendResponse({ error: String(err) }));
       return true;
+    case 'REMOVE_FAVORITE':
+      handleRemoveFavorite(msg.trackId).then(sendResponse, (err) => sendResponse({ error: String(err) }));
+      return true;
     case 'ADD_TO_PLAYLIST':
       handleAddToPlaylist(msg.trackId, msg.playlistId).then(sendResponse);
       return true;
@@ -182,6 +185,24 @@ export async function handleAddFavorite(trackId: string): Promise<MutationRespon
       ids.push(String(trackId));
       await chrome.storage.local.set({ favoritedTrackIds: ids });
     }
+  }
+
+  return result;
+}
+
+export async function handleRemoveFavorite(trackId: string): Promise<MutationResponse> {
+  const stored = await chrome.storage.local.get(['userId', 'countryCode']) as { userId?: string; countryCode?: string };
+  const countryCode = stored.countryCode ?? 'CA';
+  const url = `${TIDAL_API_BASE}/userCollections/${stored.userId}/relationships/tracks?countryCode=${countryCode}`;
+  const result = await tidalFetch(url, {
+    method: 'DELETE',
+    body: JSON.stringify({ data: [{ id: String(trackId), type: 'tracks' }] }),
+  }) as MutationResponse;
+
+  if (!result.error) {
+    const cache = await chrome.storage.local.get('favoritedTrackIds') as { favoritedTrackIds?: string[] };
+    const ids = (cache.favoritedTrackIds ?? []).filter(id => id !== String(trackId));
+    await chrome.storage.local.set({ favoritedTrackIds: ids });
   }
 
   return result;

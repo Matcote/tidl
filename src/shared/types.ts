@@ -4,6 +4,7 @@ export type ExtensionMessage =
   | { type: 'GET_PLAYLISTS' }
   | { type: 'GET_PLAYLIST_TRACKS'; playlistIds: string[] }
   | { type: 'ADD_FAVORITE'; trackId: string }
+  | { type: 'REMOVE_FAVORITE'; trackId: string }
   | { type: 'ADD_TO_PLAYLIST'; trackId: string; playlistId: string }
   | { type: 'OPEN_RESULTS'; query: string }
   | { type: 'STORE_TOKENS'; data: OAuthTokenResponse }

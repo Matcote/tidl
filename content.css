@@ -436,7 +436,7 @@
 
 .tidp-btn-fav.favorited {
   color: #ff4d6a;
-  cursor: default;
+  cursor: pointer;
 }
 
 .tidp-btn-fav.favorited svg {
@@ -448,7 +448,8 @@
 }
 
 .tidp-btn-fav.favorited:hover {
-  filter: drop-shadow(0 0 5px rgba(255, 77, 106, 0.5));
+  color: rgba(255, 77, 106, 0.45);
+  filter: none;
 }
 
 .tidp-btn-fav:disabled {

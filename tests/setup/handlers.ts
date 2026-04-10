@@ -18,6 +18,9 @@ export const handlers = [
   http.post(`${TIDAL_API_BASE}/userCollections/:userId/relationships/tracks`, () =>
     new HttpResponse(null, { status: 204 }),
   ),
+  http.delete(`${TIDAL_API_BASE}/userCollections/:userId/relationships/tracks`, () =>
+    new HttpResponse(null, { status: 204 }),
+  ),
   http.post(`${TIDAL_API_BASE}/playlists/:playlistId/relationships/items`, () =>
     new HttpResponse(null, { status: 204 }),
   ),

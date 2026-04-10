@@ -144,7 +144,7 @@ header {
   border-bottom: 1px solid #141414;
   border-left: 2px solid transparent;
   transition: border-color 0.1s, background 0.1s;
-  animation: track-in 0.22s ease-out both;
+  animation: track-in 0.22s ease-out backwards;
   animation-delay: calc(var(--i, 0) * 35ms);
 }
 
@@ -247,7 +247,7 @@ header {
 
 .btn-fav.favorited {
   color: #ff4d6a;
-  cursor: default;
+  cursor: pointer;
 }
 
 .btn-fav.favorited svg {
@@ -259,7 +259,8 @@ header {
 }
 
 .btn-fav.favorited:hover {
-  filter: drop-shadow(0 0 6px rgba(255, 77, 106, 0.5));
+  color: rgba(255, 77, 106, 0.45);
+  filter: none;
 }
 
 .btn-fav:disabled {
