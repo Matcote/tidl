@@ -259,4 +259,52 @@ describe('createPlayer', () => {
 
     expect(mockLoad).not.toHaveBeenCalled();
   });
+
+  it('isPlaying returns true when playback state is PLAYING', () => {
+    const player = createPlayer('test');
+    mockGetPlaybackState.mockReturnValue('PLAYING');
+    expect(player.isPlaying()).toBe(true);
+  });
+
+  it('isPlaying returns false when playback state is not PLAYING', () => {
+    const player = createPlayer('test');
+    mockGetPlaybackState.mockReturnValue('IDLE');
+    expect(player.isPlaying()).toBe(false);
+  });
+
+  it('dispatches tidl-playback-state event on state change', async () => {
+    const player = createPlayer('test');
+    const li = makeTrackLi('track-1');
+    container.appendChild(li);
+
+    await player.play('track-1', li);
+
+    const received: { trackId: string | null; state: string }[] = [];
+    document.addEventListener('tidl-playback-state', ((e: CustomEvent) => {
+      received.push(e.detail);
+    }) as EventListener);
+
+    dispatchPlayerEvent('playback-state-change', { state: 'PLAYING' });
+
+    expect(received).toHaveLength(1);
+    expect(received[0]).toEqual({ trackId: 'track-1', state: 'PLAYING' });
+  });
+
+  it('dispatches tidl-playback-state with IDLE on stop', async () => {
+    const player = createPlayer('test');
+    const li = makeTrackLi('track-1');
+    container.appendChild(li);
+
+    await player.play('track-1', li);
+
+    const received: { trackId: string | null; state: string }[] = [];
+    document.addEventListener('tidl-playback-state', ((e: CustomEvent) => {
+      received.push(e.detail);
+    }) as EventListener);
+
+    player.stop();
+
+    expect(received).toHaveLength(1);
+    expect(received[0]).toEqual({ trackId: 'track-1', state: 'IDLE' });
+  });
 });

@@ -25,6 +25,16 @@ const player: Player = createPlayer('rp');
 const HEART_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>`;
 const PLUS_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`;
 const CHECK_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>`;
+const PLAY_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="white" aria-hidden="true"><polygon points="6,3 20,12 6,21"/></svg>`;
+const PAUSE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="white" aria-hidden="true"><rect x="5" y="3" width="4" height="18"/><rect x="15" y="3" width="4" height="18"/></svg>`;
+
+document.addEventListener('tidl-playback-state', ((e: CustomEvent<{ trackId: string | null; state: string }>) => {
+  const { trackId, state } = e.detail;
+  const overlays = resultsList.querySelectorAll<HTMLDivElement>('.track-art-overlay');
+  for (const ol of overlays) {
+    ol.innerHTML = (ol.dataset['trackId'] === trackId && state === 'PLAYING') ? PAUSE_ICON : PLAY_ICON;
+  }
+}) as EventListener);
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 
@@ -89,12 +99,22 @@ function renderTracks(tracks: Track[]): void {
     li.className = 'track-item';
     li.style.setProperty('--i', String(i));
 
+    const artWrap = document.createElement('div');
+    artWrap.className = 'track-art-wrap';
+
     const img = document.createElement('img');
     img.className = 'track-art';
     img.alt = '';
     img.src =
       track.artUrl ??
       'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 44 44"><rect width="44" height="44" fill="%231a1a1a"/></svg>';
+
+    const overlay = document.createElement('div');
+    overlay.className = 'track-art-overlay';
+    overlay.innerHTML = PLAY_ICON;
+    overlay.dataset['trackId'] = track.id;
+
+    artWrap.append(img, overlay);
 
     const info = document.createElement('div');
     info.className = 'track-info';
@@ -133,12 +153,12 @@ function renderTracks(tracks: Track[]): void {
     plBtn.setAttribute('aria-label', 'Add to playlist');
     plBtn.addEventListener('click', (e) => togglePlaylistPicker(e, track.id, plBtn));
 
-    img.addEventListener('click', () => {
+    artWrap.addEventListener('click', () => {
       player.play(track.id, li);
     });
 
     actions.append(favBtn, plBtn);
-    li.append(img, info, duration, actions);
+    li.append(artWrap, info, duration, actions);
     resultsList.appendChild(li);
   }
 

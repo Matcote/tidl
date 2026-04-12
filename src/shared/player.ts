@@ -20,6 +20,7 @@ export interface Player {
   play(trackId: string, trackLi: HTMLLIElement): Promise<void>;
   stop(): void;
   getCurrentTrackId(): string | null;
+  isPlaying(): boolean;
   destroy(): void;
 }
 
@@ -164,6 +165,9 @@ export function createPlayer(
     } else {
       stopProgress();
     }
+    document.dispatchEvent(new CustomEvent('tidl-playback-state', {
+      detail: { trackId: currentTrackId, state: detail.state },
+    }));
   }
 
   function onTransition(e: Event): void {
@@ -249,6 +253,7 @@ export function createPlayer(
   }
 
   function stop(): void {
+    const stoppedTrackId = currentTrackId;
     stopProgress();
     removeScrubBar();
     if (currentArtEl) {
@@ -258,6 +263,9 @@ export function createPlayer(
     currentTrackId = null;
     duration = 0;
     reset().catch(() => {});
+    document.dispatchEvent(new CustomEvent('tidl-playback-state', {
+      detail: { trackId: stoppedTrackId, state: 'IDLE' },
+    }));
   }
 
   function getCurrentTrackId(): string | null {
@@ -273,5 +281,9 @@ export function createPlayer(
     events.removeEventListener('ended', onEnded);
   }
 
-  return { play, stop, getCurrentTrackId, destroy };
+  function isPlaying(): boolean {
+    return getPlaybackState() === 'PLAYING';
+  }
+
+  return { play, stop, getCurrentTrackId, isPlaying, destroy };
 }
