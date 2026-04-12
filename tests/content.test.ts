@@ -2,6 +2,22 @@
  * @vitest-environment jsdom
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+// Mock @tidal-music/player to prevent SDK side effects (localStorage, network requests)
+vi.mock('@tidal-music/player', () => ({
+  bootstrap: vi.fn(),
+  setCredentialsProvider: vi.fn(),
+  setEventSender: vi.fn(),
+  load: vi.fn().mockResolvedValue(undefined),
+  play: vi.fn().mockResolvedValue(undefined),
+  pause: vi.fn(),
+  seek: vi.fn().mockResolvedValue(undefined),
+  reset: vi.fn().mockResolvedValue(undefined),
+  events: { addEventListener: vi.fn(), removeEventListener: vi.fn() },
+  getAssetPosition: vi.fn().mockReturnValue(0),
+  getPlaybackState: vi.fn().mockReturnValue('IDLE'),
+}));
+
 import { toggleFavoriteInline, togglePlaylistPickerInline, isEditableTarget } from '../src/content';
 
 // panelPlaylists and tidalPanel are module-level in content.ts.

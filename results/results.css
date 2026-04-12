@@ -165,6 +165,15 @@ header {
   object-fit: cover;
   flex-shrink: 0;
   background: #161616;
+  cursor: pointer;
+  transition: opacity 0.15s, box-shadow 0.15s;
+}
+
+.track-art:hover { opacity: 0.75; }
+
+.track-art-playing {
+  box-shadow: 0 0 0 2px var(--accent);
+  opacity: 0.85;
 }
 
 .track-info {
@@ -373,5 +382,71 @@ header {
   font-size: 12px;
   flex-shrink: 0;
 }
+
+/* ─── Player Scrub Bar ──────────────────────────── */
+
+.rp-player-bar {
+  list-style: none;
+  padding: 0 16px 0 70px; /* align with track info (14px pad + 44px art + 12px gap) */
+  background: #111;
+  border-bottom: 1px solid #141414;
+  border-left: 2px solid var(--accent);
+  box-sizing: border-box;
+  animation: track-in 0.18s ease-out both;
+}
+
+.rp-player-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+}
+
+.rp-player-time {
+  font-size: 10px;
+  color: var(--text-6);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+  min-width: 28px;
+  font-family: var(--font);
+}
+
+.rp-player-track {
+  flex: 1;
+  height: 4px;
+  background: var(--border);
+  cursor: pointer;
+  position: relative;
+}
+
+.rp-player-track:hover { background: var(--border-hi); }
+
+.rp-player-fill {
+  height: 100%;
+  background: var(--accent);
+  width: 0%;
+  transition: width 0.2s linear;
+  pointer-events: none;
+}
+
+.rp-player-stop {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  color: var(--text-6);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  padding: 0;
+  transition: color 0.1s;
+  font-family: var(--font);
+}
+
+.rp-player-stop:hover { color: var(--accent); }
 
 .hidden { display: none !important; }

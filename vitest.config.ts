@@ -7,6 +7,7 @@ export default defineConfig({
       ['tests/shared/utils.test.ts', 'jsdom'],
       ['tests/content.test.ts',      'jsdom'],
       ['tests/results.test.ts',      'jsdom'],
+      ['tests/shared/player.test.ts', 'jsdom'],
     ],
     include: ['tests/**/*.test.ts'],
     setupFiles: ['tests/setup/chrome-mocks.ts', 'tests/setup/msw-server.ts'],

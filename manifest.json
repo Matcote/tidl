@@ -3,10 +3,11 @@
   "name": "tIDl",
   "version": "0.1.0",
   "description": "Highlight text, search Tidal, add tracks to your favorites or playlists.",
-  "permissions": ["contextMenus", "storage"],
+  "permissions": ["contextMenus", "storage", "identity"],
   "host_permissions": [
     "https://openapi.tidal.com/*",
-    "https://auth.tidal.com/*"
+    "https://auth.tidal.com/*",
+    "https://api.tidal.com/*"
   ],
   "content_scripts": [
     {

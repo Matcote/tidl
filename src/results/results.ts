@@ -2,6 +2,8 @@
 
 import { extractTracks } from '../shared/tracks';
 import { escapeHtml, openTidalLink } from '../shared/utils';
+import { createPlayer } from '../shared/player';
+import type { Player } from '../shared/player';
 import type { Track, Playlist, PlaylistsResponse, PlaylistTracksResponse, SearchResponse, FavoritesResponse } from '../shared/types';
 
 const stateLoading = document.getElementById('state-loading') as HTMLElement;
@@ -17,6 +19,8 @@ let playlists: Playlist[] = [];
 let activePlBtn: HTMLButtonElement | null = null;
 let playlistTrackMap: Record<string, string[]> = {};
 const addedMap = new Map<string, Set<string>>();
+
+const player: Player = createPlayer('rp');
 
 const HEART_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>`;
 const PLUS_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`;
@@ -128,6 +132,10 @@ function renderTracks(tracks: Track[]): void {
     plBtn.innerHTML = PLUS_SVG;
     plBtn.setAttribute('aria-label', 'Add to playlist');
     plBtn.addEventListener('click', (e) => togglePlaylistPicker(e, track.id, plBtn));
+
+    img.addEventListener('click', () => {
+      player.play(track.id, li);
+    });
 
     actions.append(favBtn, plBtn);
     li.append(img, info, duration, actions);

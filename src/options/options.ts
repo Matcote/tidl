@@ -1,8 +1,7 @@
 // tIDl — Options Page
 
-import { TIDAL_AUTH_URL, TIDAL_TOKEN_URL, SCOPES, CLIENT_ID, CLIENT_SECRET } from '../shared/constants';
-import type { OAuthTokenResponse } from '../shared/types';
-import { generateCodeVerifier, generateCodeChallenge } from '../shared/pkce';
+import { startLogin, completeLogin, logoutAuth } from '../shared/auth';
+import { CLIENT_ID } from '../shared/constants';
 
 interface TidalJwtPayload {
   firstName?: string;
@@ -88,29 +87,23 @@ export async function fetchUserProfile(accessToken: string): Promise<string | nu
 // ─── OAuth Connect ───────────────────────────────────────────────────────────
 
 connectBtn.addEventListener('click', async () => {
-  const codeVerifier = generateCodeVerifier();
-  const codeChallenge = await generateCodeChallenge(codeVerifier);
-  const state = crypto.randomUUID();
   const redirectUri = `https://${chrome.runtime.id}.chromiumapp.org/`;
 
-  const authParams = new URLSearchParams({
-    response_type: 'code',
-    client_id: CLIENT_ID,
-    redirect_uri: redirectUri,
-    scope: SCOPES,
-    code_challenge: codeChallenge,
-    code_challenge_method: 'S256',
-    state,
-  });
+  let loginUrl: string;
+  try {
+    loginUrl = await startLogin(redirectUri);
+  } catch (err) {
+    showMessage(`Auth init failed: ${err instanceof Error ? err.message : String(err)}`, true);
+    return;
+  }
 
-  const fullAuthUrl = `${TIDAL_AUTH_URL}?${authParams}`;
-  console.log('[tidl] Auth URL:', fullAuthUrl);
+  console.log('[tidl] Auth URL:', loginUrl);
   console.log('[tidl] Redirect URI:', redirectUri);
 
   let redirectUrl: string | undefined;
   try {
     redirectUrl = await chrome.identity.launchWebAuthFlow({
-      url: fullAuthUrl,
+      url: loginUrl,
       interactive: true,
     });
   } catch (err) {
@@ -124,52 +117,32 @@ connectBtn.addEventListener('click', async () => {
     return;
   }
 
-  const url = new URL(redirectUrl);
-  const code = url.searchParams.get('code');
-  if (!code || url.searchParams.get('state') !== state) {
-    showMessage('Invalid response from Tidal.', true);
-    return;
-  }
-
-  const creds = btoa(`${CLIENT_ID}:${CLIENT_SECRET}`);
-  const res = await fetch(TIDAL_TOKEN_URL, {
-    method: 'POST',
-    headers: {
-      Authorization: `Basic ${creds}`,
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: new URLSearchParams({
-      grant_type: 'authorization_code',
-      code,
-      redirect_uri: redirectUri,
-      code_verifier: codeVerifier,
-    }),
-  });
-
-  if (!res.ok) {
+  // Pass the full query string to the SDK to exchange for tokens
+  const query = new URL(redirectUrl).search;
+  try {
+    await completeLogin(query);
+  } catch (err) {
+    console.error('[tidl] finalizeLogin error:', err);
     showMessage('Failed to connect to Tidal.', true);
     return;
   }
 
-  const data = (await res.json()) as OAuthTokenResponse;
-  await chrome.runtime.sendMessage({ type: 'STORE_TOKENS', data });
+  // Get the token from the SDK to fetch user profile
+  const { credentialsProvider } = await import('../shared/auth');
+  const creds = await credentialsProvider.getCredentials();
+  const accessToken = creds.token ?? '';
 
-  const userId = data.user_id;
-  if (userId !== undefined) {
-    await chrome.storage.local.set({ userId });
-  }
-
-  let username = `User ${userId}`;
+  let username = 'Tidal User';
   let countryCode = 'US';
 
   // Try the /me API endpoint first — it has the actual display name
-  const profileName = await fetchUserProfile(data.access_token);
+  const profileName = await fetchUserProfile(accessToken);
   if (profileName) {
     username = profileName;
   } else {
     // Fall back to JWT decode; use || instead of ?? to skip empty strings
     try {
-      const b64 = data.access_token.split('.')[1]!.replace(/-/g, '+').replace(/_/g, '/');
+      const b64 = accessToken.split('.')[1]!.replace(/-/g, '+').replace(/_/g, '/');
       const payload = JSON.parse(atob(b64.padEnd(b64.length + (4 - (b64.length % 4)) % 4, '='))) as TidalJwtPayload;
       const fullName = [payload.firstName, payload.lastName].filter(Boolean).join(' ');
       username = payload.username || payload.usr || fullName || payload.email || username;
@@ -179,6 +152,15 @@ connectBtn.addEventListener('click', async () => {
     }
   }
 
+  // Store userId from JWT for API calls
+  try {
+    const b64 = accessToken.split('.')[1]!.replace(/-/g, '+').replace(/_/g, '/');
+    const payload = JSON.parse(atob(b64.padEnd(b64.length + (4 - (b64.length % 4)) % 4, '='))) as TidalJwtPayload & { uid?: number };
+    if (payload.uid !== undefined) {
+      await chrome.storage.local.set({ userId: String(payload.uid) });
+    }
+  } catch { /* JWT decode is best-effort */ }
+
   await chrome.storage.local.set({ tidalUsername: username, countryCode });
   showConnected(username);
   showMessage(`Connected as ${username}.`);
@@ -187,7 +169,8 @@ connectBtn.addEventListener('click', async () => {
 // ─── Disconnect ───────────────────────────────────────────────────────────────
 
 disconnectBtn.addEventListener('click', async () => {
-  await chrome.storage.local.remove(['accessToken', 'refreshToken', 'expiresAt', 'tidalUsername', 'countryCode', 'favoritedTrackIds', 'favoritesLastFetched']);
+  logoutAuth();
+  await chrome.storage.local.remove(['accessToken', 'refreshToken', 'expiresAt', 'tidalUsername', 'countryCode', 'userId', 'favoritedTrackIds', 'favoritesLastFetched']);
   statusConnected.classList.add('hidden');
   statusDisconnected.classList.remove('hidden');
   connectBtn.classList.remove('hidden');

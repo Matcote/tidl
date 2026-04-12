@@ -4,6 +4,8 @@
 
 import { extractTracks } from './shared/tracks';
 import { escapeHtml, openTidalLink } from './shared/utils';
+import { createPlayer } from './shared/player';
+import type { Player } from './shared/player';
 import type { Track, Playlist, PlaylistsResponse, PlaylistTracksResponse, SearchResponse, FavoritesResponse } from './shared/types';
 
 let tidalPopupBtn: HTMLButtonElement | null = null;
@@ -12,6 +14,7 @@ let panelPlaylists: Playlist[] = [];
 let panelActivePlBtn: HTMLButtonElement | null = null;
 let panelPlaylistTrackMap: Record<string, string[]> = {};
 const panelAddedMap = new Map<string, Set<string>>();
+let player: Player | null = null;
 
 // Playlist picker lives on document.body so position:fixed isn't clipped by
 // the panel's CSS transform.
@@ -38,6 +41,10 @@ function removePopup(): void {
 }
 
 function removePanel(): void {
+  if (player) {
+    player.destroy();
+    player = null;
+  }
   if (tidalPanel) {
     tidalPanel.remove();
     tidalPanel = null;
@@ -241,6 +248,8 @@ function openSearchPanel(
 
   document.body.appendChild(tidalPanel);
 
+  player = createPlayer('tidp');
+
   tidalPanel.querySelector('.tidp-close')!.addEventListener('click', (e) => {
     e.stopPropagation();
     removePanel();
@@ -420,6 +429,11 @@ function renderTracks(tracks: Track[], listEl: HTMLUListElement): void {
     plBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       togglePlaylistPickerInline(e, track.id, plBtn);
+    });
+
+    img.addEventListener('click', (e) => {
+      e.stopPropagation();
+      player?.play(track.id, li);
     });
 
     actions.append(favBtn, plBtn);

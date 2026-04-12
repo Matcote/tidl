@@ -349,6 +349,15 @@
   flex-shrink: 0;
   background: #161616;
   display: block;
+  cursor: pointer;
+  transition: opacity 0.15s, box-shadow 0.15s;
+}
+
+.tidp-art:hover { opacity: 0.75; }
+
+.tidp-art-playing {
+  box-shadow: 0 0 0 2px #00FFFF;
+  opacity: 0.85;
 }
 
 .tidp-info {
@@ -582,6 +591,71 @@
   z-index: 5;
   border-radius: 0;
 }
+
+/* ─── Player Scrub Bar ──────────────────────────────────── */
+
+.tidp-player-bar {
+  list-style: none;
+  padding: 0 14px 0 62px; /* align with track info (12px pad + 40px art + 10px gap) */
+  background: #111;
+  border-bottom: 1px solid #141414;
+  border-left: 2px solid #00FFFF;
+  box-sizing: border-box;
+  animation: tidp-track-in 0.18s ease-out both;
+}
+
+.tidp-player-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+}
+
+.tidp-player-time {
+  font-size: 10px;
+  color: #666;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+  min-width: 28px;
+  font-family: 'Chakra Petch', 'IBM Plex Mono', system-ui, monospace;
+}
+
+.tidp-player-track {
+  flex: 1;
+  height: 4px;
+  background: #2a2a2a;
+  cursor: pointer;
+  position: relative;
+  border-radius: 0;
+}
+
+.tidp-player-track:hover { background: #333; }
+
+.tidp-player-fill {
+  height: 100%;
+  background: #00FFFF;
+  width: 0%;
+  transition: width 0.2s linear;
+  pointer-events: none;
+}
+
+.tidp-player-stop {
+  all: initial;
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  color: #666;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: color 0.1s;
+}
+
+.tidp-player-stop:hover { color: #00FFFF; }
 
 /* ─── Utility ────────────────────────────────────────────── */
 

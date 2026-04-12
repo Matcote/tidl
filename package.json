@@ -22,5 +22,10 @@
     "msw": "^2.12.13",
     "typescript": "^5.9.3",
     "vitest": "^4.1.0"
+  },
+  "dependencies": {
+    "@tidal-music/auth": "^1.6.0",
+    "@tidal-music/common": "^0.2.0",
+    "@tidal-music/player": "^0.16.0"
   }
 }

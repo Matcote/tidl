@@ -1,7 +1,8 @@
 // tIDl — Background Service Worker
 // Handles: context menu, OAuth token management, Tidal API calls
 
-import { TIDAL_TOKEN_URL, TIDAL_API_BASE, CLIENT_ID, CLIENT_SECRET } from './shared/constants';
+import { TIDAL_API_BASE } from './shared/constants';
+import { initAuth, credentialsProvider } from './shared/auth';
 import type {
   ExtensionMessage,
   OAuthTokenResponse,
@@ -10,6 +11,7 @@ import type {
   PlaylistTracksResponse,
   MutationResponse,
   FavoritesResponse,
+  CredentialsResponse,
 } from './shared/types';
 
 // ─── Context Menu Setup ──────────────────────────────────────────────────────
@@ -76,6 +78,9 @@ chrome.runtime.onMessage.addListener((msg: ExtensionMessage, _sender, sendRespon
     case 'GET_FAVORITES':
       handleGetFavorites().then(sendResponse);
       return true;
+    case 'GET_CREDENTIALS':
+      handleGetCredentials().then(sendResponse);
+      return true;
     case 'STORE_TOKENS':
       storeTokens(msg.data).then(() => sendResponse({ ok: true }));
       return true;
@@ -95,6 +100,17 @@ async function openResults(query: string): Promise<void> {
     width: 500,
     height: 620,
   });
+}
+
+async function handleGetCredentials(): Promise<CredentialsResponse> {
+  try {
+    await initAuth();
+    const creds = await credentialsProvider.getCredentials();
+    if (!creds.token) return { error: 'Not authenticated' };
+    return { token: creds.token, clientId: creds.clientId, userId: creds.userId ?? undefined };
+  } catch {
+    return { error: 'Not authenticated' };
+  }
 }
 
 // ─── Tidal API Calls ─────────────────────────────────────────────────────────
@@ -356,55 +372,23 @@ export async function tidalFetch(
 }
 
 // ─── Token Management ────────────────────────────────────────────────────────
+// Token lifecycle (obtain, refresh, store) is now handled by @tidal-music/auth.
+// getValidToken() is a thin wrapper for existing call-sites.
 
 export async function getValidToken(): Promise<string | null> {
-  const stored = await chrome.storage.local.get(['accessToken', 'refreshToken', 'expiresAt']) as {
-    accessToken?: string;
-    refreshToken?: string;
-    expiresAt?: number;
-  };
-  if (!stored.accessToken) return null;
-
-  // Refresh if within 60 seconds of expiry
-  if (Date.now() > (stored.expiresAt ?? 0) - 60_000) {
-    return refreshAccessToken(stored.refreshToken);
+  try {
+    await initAuth();
+    const creds = await credentialsProvider.getCredentials();
+    return creds.token || null;
+  } catch {
+    return null;
   }
-
-  return stored.accessToken;
-}
-
-export async function refreshAccessToken(refreshToken: string | undefined): Promise<string | null> {
-  if (!refreshToken) return null;
-
-  const creds = btoa(`${CLIENT_ID}:${CLIENT_SECRET}`);
-
-  const res = await fetch(TIDAL_TOKEN_URL, {
-    method: 'POST',
-    headers: {
-      Authorization: `Basic ${creds}`,
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: new URLSearchParams({
-      grant_type: 'refresh_token',
-      refresh_token: refreshToken,
-    }),
-  });
-
-  if (!res.ok) return null;
-  const data = (await res.json()) as OAuthTokenResponse;
-  await storeTokens(data);
-  return data.access_token;
 }
 
 export async function storeTokens(data: OAuthTokenResponse): Promise<void> {
-  const stored = await chrome.storage.local.get('refreshToken') as { refreshToken?: string };
-  const update: Record<string, unknown> = {
-    accessToken: data.access_token,
-    refreshToken: data.refresh_token ?? stored.refreshToken,
-    expiresAt: Date.now() + data.expires_in * 1000,
-  };
-  if (data.user_id !== undefined) update['userId'] = data.user_id;
-  await chrome.storage.local.set(update);
-  // Clear caches — user identity may have changed
-  await chrome.storage.local.remove(['favoritedTrackIds', 'favoritesLastFetched', 'playlistTrackMap', 'playlistTracksFetched']);
+  // Legacy handler kept for the STORE_TOKENS message type.
+  // New auth flow stores tokens via the SDK; this is a no-op fallback.
+  if (data.user_id !== undefined) {
+    await chrome.storage.local.set({ userId: String(data.user_id) });
+  }
 }
