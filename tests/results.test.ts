@@ -80,7 +80,7 @@ describe('toggleFavorite', () => {
     const btn = makeButton();
     await toggleFavorite('track-1', btn);
     expect(btn.classList.contains('favorited')).toBe(true);
-    expect(btn.getAttribute('aria-label')).toBe('Favorited');
+    expect(btn.getAttribute('aria-label')).toBe('Remove from favorites');
     expect(btn.disabled).toBe(false);
   });
 
@@ -114,6 +114,16 @@ describe('toggleFavorite', () => {
     expect(sendMock).toHaveBeenCalledWith({ type: 'REMOVE_FAVORITE', trackId: 'track-1' });
     expect(btn.classList.contains('favorited')).toBe(false);
     expect(btn.getAttribute('aria-label')).toBe('Add to favorites');
+  });
+
+  it('re-enables button when favorite verification fails', async () => {
+    (chrome.runtime.sendMessage as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce({ error: 'API error 409', status: 409 })
+      .mockRejectedValueOnce(new Error('message channel closed'));
+    const btn = makeButton();
+    await toggleFavorite('track-1', btn);
+    expect(btn.classList.contains('favorited')).toBe(false);
+    expect(btn.disabled).toBe(false);
   });
 });
 

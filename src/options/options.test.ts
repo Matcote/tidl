@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { fetchUserProfile } from './options';
+import { decodeTidalJwtPayload, fetchUserProfile } from './options';
 
 describe('fetchUserProfile', () => {
   beforeEach(() => {
@@ -59,5 +59,25 @@ describe('fetchUserProfile', () => {
       json: async () => ({ data: { attributes: { displayName: '' } } }),
     }));
     expect(await fetchUserProfile('token123')).toBeNull();
+  });
+});
+
+describe('decodeTidalJwtPayload', () => {
+  it('decodes country code and user id from JWT payload', () => {
+    const payload = btoa(JSON.stringify({ cc: 'CA', uid: 12345, username: 'matcote' }))
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
+    const token = `header.${payload}.signature`;
+
+    expect(decodeTidalJwtPayload(token)).toMatchObject({
+      cc: 'CA',
+      uid: 12345,
+      username: 'matcote',
+    });
+  });
+
+  it('returns null for malformed tokens', () => {
+    expect(decodeTidalJwtPayload('not-a-jwt')).toBeNull();
   });
 });

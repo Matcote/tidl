@@ -10,6 +10,7 @@ interface TidalJwtPayload {
   usr?: string;
   email?: string;
   cc?: string;
+  uid?: number;
 }
 
 const connectBtn = document.getElementById('connect-btn') as HTMLButtonElement;
@@ -84,6 +85,18 @@ export async function fetchUserProfile(accessToken: string): Promise<string | nu
   }
 }
 
+export function decodeTidalJwtPayload(accessToken: string): TidalJwtPayload | null {
+  try {
+    const b64 = accessToken.split('.')[1];
+    if (!b64) return null;
+    const padded = b64.padEnd(b64.length + (4 - (b64.length % 4)) % 4, '=');
+    return JSON.parse(atob(padded.replace(/-/g, '+').replace(/_/g, '/'))) as TidalJwtPayload;
+  } catch (e) {
+    console.warn('[tidl] JWT decode failed:', e);
+    return null;
+  }
+}
+
 // ─── OAuth Connect ───────────────────────────────────────────────────────────
 
 connectBtn.addEventListener('click', async () => {
@@ -133,7 +146,9 @@ connectBtn.addEventListener('click', async () => {
   const accessToken = creds.token ?? '';
 
   let username = 'Tidal User';
-  let countryCode = 'US';
+  let countryCode = 'CA';
+  const payload = decodeTidalJwtPayload(accessToken);
+  if (payload?.cc) countryCode = payload.cc;
 
   // Try the /me API endpoint first — it has the actual display name
   const profileName = await fetchUserProfile(accessToken);
@@ -141,25 +156,14 @@ connectBtn.addEventListener('click', async () => {
     username = profileName;
   } else {
     // Fall back to JWT decode; use || instead of ?? to skip empty strings
-    try {
-      const b64 = accessToken.split('.')[1]!.replace(/-/g, '+').replace(/_/g, '/');
-      const payload = JSON.parse(atob(b64.padEnd(b64.length + (4 - (b64.length % 4)) % 4, '='))) as TidalJwtPayload;
+    if (payload) {
       const fullName = [payload.firstName, payload.lastName].filter(Boolean).join(' ');
       username = payload.username || payload.usr || fullName || payload.email || username;
-      countryCode = payload.cc ?? countryCode;
-    } catch (e) {
-      console.warn('[tidl] JWT decode failed:', e);
     }
   }
 
   // Store userId from JWT for API calls
-  try {
-    const b64 = accessToken.split('.')[1]!.replace(/-/g, '+').replace(/_/g, '/');
-    const payload = JSON.parse(atob(b64.padEnd(b64.length + (4 - (b64.length % 4)) % 4, '='))) as TidalJwtPayload & { uid?: number };
-    if (payload.uid !== undefined) {
-      await chrome.storage.local.set({ userId: String(payload.uid) });
-    }
-  } catch { /* JWT decode is best-effort */ }
+  if (payload?.uid !== undefined) await chrome.storage.local.set({ userId: String(payload.uid) });
 
   await chrome.storage.local.set({ tidalUsername: username, countryCode });
   showConnected(username);

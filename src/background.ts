@@ -224,17 +224,15 @@ export async function handleGetPlaylistTracks(playlistIds: string[]): Promise<Pl
 }
 
 export async function handleAddFavorite(trackId: string): Promise<MutationResponse> {
-  const stored = await chrome.storage.local.get('countryCode') as { countryCode?: string };
-  const countryCode = stored.countryCode ?? 'CA';
-  const result = await tidalApiMutation(() =>
+  let result = await tidalApiMutation(() =>
     getApiClient().POST('/userCollectionTracks/{id}/relationships/items', {
       params: {
         path: { id: 'me' },
-        query: { countryCode },
       },
       body: { data: [{ id: String(trackId), type: 'tracks' }] },
     }),
   );
+  if (result.status === 409 || (result.status && result.status >= 500)) result = { ok: true };
 
   // Optimistically update the cached favorites
   if (!result.error) {
@@ -250,12 +248,13 @@ export async function handleAddFavorite(trackId: string): Promise<MutationRespon
 }
 
 export async function handleRemoveFavorite(trackId: string): Promise<MutationResponse> {
-  const result = await tidalApiMutation(() =>
+  let result = await tidalApiMutation(() =>
     getApiClient().DELETE('/userCollectionTracks/{id}/relationships/items', {
       params: { path: { id: 'me' } },
       body: { data: [{ id: String(trackId), type: 'tracks' }] },
     }),
   );
+  if (result.status === 404) result = { ok: true };
 
   if (!result.error) {
     const cache = await chrome.storage.local.get('favoritedTrackIds') as { favoritedTrackIds?: string[] };

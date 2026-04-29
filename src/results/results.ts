@@ -197,7 +197,7 @@ function setFavoriteButtonState(
 ): void {
   btn.classList.toggle('favorited', favorited);
   btn.classList.toggle('no-anim', favorited && options.animate === false);
-  btn.setAttribute('aria-label', favorited ? 'Favorited' : 'Add to favorites');
+  btn.setAttribute('aria-label', favorited ? 'Remove from favorites' : 'Add to favorites');
   btn.setAttribute('aria-pressed', String(favorited));
 
   const heartPath = btn.querySelector<SVGPathElement>('svg path');
@@ -207,12 +207,16 @@ function setFavoriteButtonState(
   }
 }
 
-async function confirmFavorite(trackId: string): Promise<boolean> {
-  const result = (await chrome.runtime.sendMessage({
-    type: 'GET_FAVORITES',
-    forceRefresh: true,
-  })) as FavoritesResponse;
-  return new Set(result.trackIds ?? []).has(trackId);
+async function confirmFavorite(trackId: string): Promise<boolean | null> {
+  try {
+    const result = (await chrome.runtime.sendMessage({
+      type: 'GET_FAVORITES',
+      forceRefresh: true,
+    })) as FavoritesResponse;
+    return new Set(result.trackIds ?? []).has(trackId);
+  } catch {
+    return null;
+  }
 }
 
 export async function toggleFavorite(trackId: string, btn: HTMLButtonElement): Promise<void> {
@@ -221,19 +225,23 @@ export async function toggleFavorite(trackId: string, btn: HTMLButtonElement): P
   btn.disabled = true;
   setFavoriteButtonState(btn, nextFavorited);
 
-  if (isFavorited) {
-    const result = (await chrome.runtime.sendMessage({ type: 'REMOVE_FAVORITE', trackId })) as { error?: string };
-    if (result?.error) {
-      setFavoriteButtonState(btn, isFavorited);
+  try {
+    if (isFavorited) {
+      const result = (await chrome.runtime.sendMessage({ type: 'REMOVE_FAVORITE', trackId })) as MutationResponse;
+      if (result?.error && (await confirmFavorite(trackId)) !== false) {
+        setFavoriteButtonState(btn, isFavorited);
+      }
+    } else {
+      const result = (await chrome.runtime.sendMessage({ type: 'ADD_FAVORITE', trackId })) as MutationResponse;
+      if (result?.error && (await confirmFavorite(trackId)) !== true) {
+        setFavoriteButtonState(btn, isFavorited);
+      }
     }
-  } else {
-    const result = (await chrome.runtime.sendMessage({ type: 'ADD_FAVORITE', trackId })) as MutationResponse;
-    if (result?.error && !(await confirmFavorite(trackId))) {
+  } catch {
       setFavoriteButtonState(btn, isFavorited);
-    }
+  } finally {
+    btn.disabled = false;
   }
-
-  btn.disabled = false;
 }
 
 export function togglePlaylistPicker(e: MouseEvent, trackId: string, btn: HTMLButtonElement): void {

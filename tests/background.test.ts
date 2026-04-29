@@ -158,8 +158,36 @@ describe('handleAddFavorite', () => {
 
     const result = await bg.handleAddFavorite('track-1');
     expect(capturedUrl).toContain('/userCollectionTracks/me/relationships/items');
+    expect(capturedUrl).not.toContain('countryCode=');
     expect(capturedBody).toEqual({ data: [{ id: 'track-1', type: 'tracks' }] });
     expect(result).toEqual({ ok: true });
+  });
+
+  it('treats server errors from add favorite as optimistic success', async () => {
+    seedLocalStorage({ userId: 'u123', countryCode: 'US' });
+
+    server.use(
+      http.post(`${TIDAL_API_BASE}/userCollectionTracks/:collectionId/relationships/items`, () =>
+        new HttpResponse(null, { status: 500 }),
+      )
+    );
+
+    const result = await bg.handleAddFavorite('track-1');
+    expect(result).toEqual({ ok: true });
+    expect(getLocalStore()['favoritedTrackIds']).toEqual(['track-1']);
+  });
+
+  it('treats duplicate favorite response as success', async () => {
+    seedLocalStorage({ userId: 'u123', countryCode: 'US' });
+    server.use(
+      http.post(`${TIDAL_API_BASE}/userCollectionTracks/:collectionId/relationships/items`, () =>
+        new HttpResponse(null, { status: 409 }),
+      ),
+    );
+
+    const result = await bg.handleAddFavorite('track-1');
+    expect(result).toEqual({ ok: true });
+    expect(getLocalStore()['favoritedTrackIds']).toEqual(['track-1']);
   });
 });
 
@@ -205,12 +233,28 @@ describe('handleRemoveFavorite', () => {
     server.use(
       http.delete(`${TIDAL_API_BASE}/userCollectionTracks/:collectionId/relationships/items`, () =>
         new HttpResponse(null, { status: 500 }),
-      ),
+      )
     );
 
     await bg.handleRemoveFavorite('track-1');
 
     expect(getLocalStore()['favoritedTrackIds']).toEqual(['track-1', 'track-2']);
+  });
+
+  it('treats missing favorite on remove as success', async () => {
+    seedLocalStorage({
+      userId: 'u123',
+      favoritedTrackIds: ['track-1', 'track-2'],
+    });
+    server.use(
+      http.delete(`${TIDAL_API_BASE}/userCollectionTracks/:collectionId/relationships/items`, () =>
+        new HttpResponse(null, { status: 404 }),
+      ),
+    );
+
+    const result = await bg.handleRemoveFavorite('track-2');
+    expect(result).toEqual({ ok: true });
+    expect(getLocalStore()['favoritedTrackIds']).toEqual(['track-1']);
   });
 });
 
