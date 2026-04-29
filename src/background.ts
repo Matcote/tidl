@@ -220,8 +220,11 @@ export async function handleAddFavorite(trackId: string): Promise<MutationRespon
     const ids = cache.favoritedTrackIds ?? [];
     if (!ids.includes(String(trackId))) {
       ids.push(String(trackId));
-      await chrome.storage.local.set({ favoritedTrackIds: ids });
     }
+    await chrome.storage.local.set({
+      favoritedTrackIds: ids,
+      favoritesLastFetched: Date.now(),
+    });
   }
 
   return result;
@@ -239,7 +242,10 @@ export async function handleRemoveFavorite(trackId: string): Promise<MutationRes
   if (!result.error) {
     const cache = await chrome.storage.local.get('favoritedTrackIds') as { favoritedTrackIds?: string[] };
     const ids = (cache.favoritedTrackIds ?? []).filter(id => id !== String(trackId));
-    await chrome.storage.local.set({ favoritedTrackIds: ids });
+    await chrome.storage.local.set({
+      favoritedTrackIds: ids,
+      favoritesLastFetched: Date.now(),
+    });
   }
 
   return result;

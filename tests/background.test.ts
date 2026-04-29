@@ -265,6 +265,27 @@ describe('handleAddFavorite', () => {
     expect(result).toEqual({ ok: true });
     expect(getLocalStore()['favoritedTrackIds']).toEqual(['track-1']);
   });
+
+  it('marks the favorites cache fresh after adding a track', async () => {
+    seedLocalStorage({ favoritedTrackIds: [] });
+
+    await bg.handleAddFavorite('track-1');
+
+    const store = getLocalStore();
+    expect(store['favoritedTrackIds']).toEqual(['track-1']);
+    expect(typeof store['favoritesLastFetched']).toBe('number');
+  });
+
+  it('uses the locally updated favorites cache immediately after adding', async () => {
+    seedLocalStorage({ favoritedTrackIds: [] });
+    await bg.handleAddFavorite('track-1');
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    const result = await bg.handleGetFavorites();
+
+    expect(result.trackIds).toEqual(['track-1']);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
 });
 
 describe('handleRemoveFavorite', () => {
@@ -299,6 +320,7 @@ describe('handleRemoveFavorite', () => {
     await bg.handleRemoveFavorite('track-2');
 
     expect(getLocalStore()['favoritedTrackIds']).toEqual(['track-1', 'track-3']);
+    expect(typeof getLocalStore()['favoritesLastFetched']).toBe('number');
   });
 
   it('does not mutate cache when API returns an error', async () => {
