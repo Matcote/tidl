@@ -8,7 +8,7 @@ export type ExtensionMessage =
   | { type: 'ADD_TO_PLAYLIST'; trackId: string; playlistId: string }
   | { type: 'OPEN_RESULTS'; query: string }
   | { type: 'STORE_TOKENS'; data: OAuthTokenResponse }
-  | { type: 'GET_FAVORITES' }
+  | { type: 'GET_FAVORITES'; forceRefresh?: boolean }
   | { type: 'GET_CREDENTIALS' };
 
 // Normalized domain objects

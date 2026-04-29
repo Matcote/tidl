@@ -283,6 +283,11 @@ header {
   transition: fill 0.2s;
 }
 
+.btn-fav svg path {
+  fill: none !important;
+  stroke: currentColor !important;
+}
+
 .btn-fav:hover {
   color: rgba(255, 255, 255, 0.85);
   filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.4));
@@ -295,6 +300,11 @@ header {
 
 .btn-fav.favorited svg {
   fill: currentColor;
+}
+
+.btn-fav.favorited svg path {
+  fill: currentColor !important;
+  stroke: currentColor !important;
 }
 
 .btn-fav.favorited:not(.no-anim) svg {

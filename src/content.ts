@@ -6,7 +6,7 @@ import { extractTracks } from './shared/tracks';
 import { escapeHtml, openTidalLink } from './shared/utils';
 import { createPlayer } from './shared/player';
 import type { Player } from './shared/player';
-import type { Track, Playlist, PlaylistsResponse, PlaylistTracksResponse, SearchResponse, FavoritesResponse } from './shared/types';
+import type { Track, Playlist, PlaylistsResponse, PlaylistTracksResponse, SearchResponse, FavoritesResponse, MutationResponse } from './shared/types';
 
 let tidalPopupBtn: HTMLButtonElement | null = null;
 let tidalPanel: HTMLDivElement | null = null;
@@ -479,36 +479,57 @@ function markFavoritedButtons(listEl: HTMLUListElement, favIds: Set<string>): vo
   for (const btn of Array.from(listEl.querySelectorAll<HTMLButtonElement>('.tidp-btn-fav[data-track-id]'))) {
     const trackId = btn.dataset['trackId']!;
     if (favIds.has(trackId) && !btn.classList.contains('favorited')) {
-      btn.classList.add('favorited', 'tidp-no-anim');
-      btn.setAttribute('aria-label', 'Favorited');
+      setFavoriteButtonStateInline(btn, true, { animate: false });
     }
   }
 }
 
 // ─── Actions ──────────────────────────────────────────────────────────────────
 
+function setFavoriteButtonStateInline(
+  btn: HTMLButtonElement,
+  favorited: boolean,
+  options: { animate?: boolean } = {},
+): void {
+  btn.classList.toggle('favorited', favorited);
+  btn.classList.toggle('tidp-no-anim', favorited && options.animate === false);
+  btn.setAttribute('aria-label', favorited ? 'Favorited' : 'Add to favorites');
+  btn.setAttribute('aria-pressed', String(favorited));
+
+  const heartPath = btn.querySelector<SVGPathElement>('svg path');
+  if (heartPath) {
+    heartPath.style.setProperty('fill', favorited ? 'currentColor' : 'none', 'important');
+    heartPath.style.setProperty('stroke', 'currentColor', 'important');
+  }
+}
+
+async function confirmFavoriteInline(trackId: string): Promise<boolean> {
+  const result = (await chrome.runtime.sendMessage({
+    type: 'GET_FAVORITES',
+    forceRefresh: true,
+  })) as FavoritesResponse;
+  return new Set(result.trackIds ?? []).has(trackId);
+}
+
 export async function toggleFavoriteInline(trackId: string, btn: HTMLButtonElement): Promise<void> {
   const isFavorited = btn.classList.contains('favorited');
+  const nextFavorited = !isFavorited;
   btn.disabled = true;
+  setFavoriteButtonStateInline(btn, nextFavorited);
+
   if (isFavorited) {
     const result = (await chrome.runtime.sendMessage({ type: 'REMOVE_FAVORITE', trackId })) as { error?: string };
     if (result?.error) {
-      btn.disabled = false;
-    } else {
-      btn.classList.remove('favorited');
-      btn.setAttribute('aria-label', 'Add to favorites');
-      btn.disabled = false;
+      setFavoriteButtonStateInline(btn, isFavorited);
     }
   } else {
-    const result = (await chrome.runtime.sendMessage({ type: 'ADD_FAVORITE', trackId })) as { error?: string };
-    if (result?.error) {
-      btn.disabled = false;
-    } else {
-      btn.classList.add('favorited');
-      btn.setAttribute('aria-label', 'Favorited');
-      btn.disabled = false;
+    const result = (await chrome.runtime.sendMessage({ type: 'ADD_FAVORITE', trackId })) as MutationResponse;
+    if (result?.error && !(await confirmFavoriteInline(trackId))) {
+      setFavoriteButtonStateInline(btn, isFavorited);
     }
   }
+
+  btn.disabled = false;
 }
 
 export function togglePlaylistPickerInline(

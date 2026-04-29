@@ -471,6 +471,11 @@
   transition: fill 0.2s;
 }
 
+.tidp-btn-fav svg path {
+  fill: none !important;
+  stroke: currentColor !important;
+}
+
 .tidp-btn-fav:hover {
   color: rgba(255, 255, 255, 0.85);
   filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.4));
@@ -483,6 +488,11 @@
 
 .tidp-btn-fav.favorited svg {
   fill: currentColor;
+}
+
+.tidp-btn-fav.favorited svg path {
+  fill: currentColor !important;
+  stroke: currentColor !important;
 }
 
 .tidp-btn-fav.favorited:not(.tidp-no-anim) svg {

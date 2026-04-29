@@ -39,7 +39,7 @@ function makePanel(): HTMLDivElement {
 
 function makeButton(): HTMLButtonElement {
   const btn = document.createElement('button');
-  btn.innerHTML = '<svg></svg>';
+  btn.innerHTML = '<svg><path></path></svg>';
   document.body.appendChild(btn);
   return btn;
 }
@@ -70,6 +70,17 @@ describe('toggleFavoriteInline', () => {
     const btn = makeButton();
     await toggleFavoriteInline('track-1', btn);
     expect(btn.classList.contains('favorited')).toBe(false);
+    expect(btn.disabled).toBe(false);
+  });
+
+  it('keeps heart filled when add reports error but refreshed favorites includes track', async () => {
+    (chrome.runtime.sendMessage as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce({ error: 'API error 409', status: 409 })
+      .mockResolvedValueOnce({ trackIds: ['track-1'] });
+    const btn = makeButton();
+    await toggleFavoriteInline('track-1', btn);
+    expect(btn.classList.contains('favorited')).toBe(true);
+    expect(btn.querySelector('path')?.style.getPropertyValue('fill')).toBe('currentcolor');
     expect(btn.disabled).toBe(false);
   });
 
