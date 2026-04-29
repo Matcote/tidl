@@ -149,7 +149,7 @@ describe('handleAddFavorite', () => {
     let capturedUrl: string | undefined;
     let capturedBody: unknown;
     server.use(
-      http.post(`${TIDAL_API_BASE}/userCollections/:userId/relationships/tracks`, async ({ request }) => {
+      http.post(`${TIDAL_API_BASE}/userCollectionTracks/:collectionId/relationships/items`, async ({ request }) => {
         capturedUrl = request.url;
         capturedBody = await request.json();
         return new HttpResponse(null, { status: 204 });
@@ -157,7 +157,7 @@ describe('handleAddFavorite', () => {
     );
 
     const result = await bg.handleAddFavorite('track-1');
-    expect(capturedUrl).toContain('/userCollections/u123/relationships/tracks');
+    expect(capturedUrl).toContain('/userCollectionTracks/me/relationships/items');
     expect(capturedBody).toEqual({ data: [{ id: 'track-1', type: 'tracks' }] });
     expect(result).toEqual({ ok: true });
   });
@@ -171,7 +171,7 @@ describe('handleRemoveFavorite', () => {
     let capturedUrl: string | undefined;
     let capturedBody: unknown;
     server.use(
-      http.delete(`${TIDAL_API_BASE}/userCollections/:userId/relationships/tracks`, async ({ request }) => {
+      http.delete(`${TIDAL_API_BASE}/userCollectionTracks/:collectionId/relationships/items`, async ({ request }) => {
         capturedMethod = request.method;
         capturedUrl = request.url;
         capturedBody = await request.json();
@@ -181,7 +181,7 @@ describe('handleRemoveFavorite', () => {
 
     const result = await bg.handleRemoveFavorite('track-1');
     expect(capturedMethod).toBe('DELETE');
-    expect(capturedUrl).toContain('/userCollections/u123/relationships/tracks');
+    expect(capturedUrl).toContain('/userCollectionTracks/me/relationships/items');
     expect(capturedBody).toEqual({ data: [{ id: 'track-1', type: 'tracks' }] });
     expect(result).toEqual({ ok: true });
   });
@@ -203,7 +203,7 @@ describe('handleRemoveFavorite', () => {
       favoritedTrackIds: ['track-1', 'track-2'],
     });
     server.use(
-      http.delete(`${TIDAL_API_BASE}/userCollections/:userId/relationships/tracks`, () =>
+      http.delete(`${TIDAL_API_BASE}/userCollectionTracks/:collectionId/relationships/items`, () =>
         new HttpResponse(null, { status: 500 }),
       ),
     );
@@ -331,14 +331,67 @@ describe('handleGetPlaylistTracks', () => {
   });
 });
 
-describe('tidalFetch', () => {
+describe('handleGetFavorites', () => {
+  it('fetches favorites from userCollectionTracks/me and follows pagination', async () => {
+    vi.useFakeTimers();
+    const cursors: Array<string | null> = [];
+    const collectionIds: string[] = [];
+
+    server.use(
+      http.get(`${TIDAL_API_BASE}/userCollectionTracks/:collectionId/relationships/items`, ({ request, params }) => {
+        const cursor = new URL(request.url).searchParams.get('page[cursor]');
+        cursors.push(cursor);
+        collectionIds.push(String(params['collectionId']));
+
+        if (!cursor) {
+          return HttpResponse.json({
+            data: [{ id: 'track-a', type: 'tracks' }],
+            links: {
+              next: `${TIDAL_API_BASE}/userCollectionTracks/me/relationships/items?page[cursor]=next-page`,
+            },
+          });
+        }
+
+        return HttpResponse.json({
+          data: [{ id: 'track-b', type: 'tracks' }],
+          links: {},
+        });
+      }),
+    );
+
+    const promise = bg.handleGetFavorites();
+    await vi.advanceTimersByTimeAsync(500);
+    const result = await promise;
+
+    expect(result.trackIds).toEqual(['track-a', 'track-b']);
+    expect(collectionIds).toEqual(['me', 'me']);
+    expect(cursors).toEqual([null, 'next-page']);
+    expect(getLocalStore()['favoritedTrackIds']).toEqual(['track-a', 'track-b']);
+    vi.useRealTimers();
+  });
+
+  it('returns cached favorites without hitting the network when fresh', async () => {
+    seedLocalStorage({
+      favoritedTrackIds: ['track-x', 'track-y'],
+      favoritesLastFetched: Date.now(),
+    });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    const result = await bg.handleGetFavorites();
+
+    expect(result.trackIds).toEqual(['track-x', 'track-y']);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe('typed Tidal API client wrapper', () => {
   it('returns error when credentials provider has no token', async () => {
     mockGetCredentials.mockResolvedValue({ token: '', clientId: '', userId: '', requestedScopes: [] });
-    const result = await bg.tidalFetch(`${TIDAL_API_BASE}/playlists`);
+    const result = await bg.handleGetPlaylists();
     expect(result).toEqual({ error: 'Not authenticated' });
   });
 
-  it('injects correct headers', async () => {
+  it('injects auth and JSON:API accept headers', async () => {
     mockGetCredentials.mockResolvedValue({ token: 'bearer-tok', clientId: 'c', userId: 'u', requestedScopes: [] });
 
     let capturedHeaders: Headers | undefined;
@@ -349,18 +402,13 @@ describe('tidalFetch', () => {
       }),
     );
 
-    await bg.tidalFetch(`${TIDAL_API_BASE}/playlists`);
+    await bg.handleGetPlaylists();
     expect(capturedHeaders!.get('Authorization')).toBe('Bearer bearer-tok');
-    expect(capturedHeaders!.get('Content-Type')).toBe('application/vnd.api+json');
     expect(capturedHeaders!.get('Accept')).toBe('application/vnd.api+json');
   });
 
   it('returns { ok: true } for 204 response', async () => {
-    seedLocalStorage({ userId: 'u1' });
-    const result = await bg.tidalFetch(
-      `${TIDAL_API_BASE}/userCollections/u1/relationships/tracks`,
-      { method: 'POST', body: JSON.stringify({ data: [] }) },
-    );
+    const result = await bg.handleAddFavorite('track-1');
     expect(result).toEqual({ ok: true });
   });
 
@@ -368,12 +416,12 @@ describe('tidalFetch', () => {
     server.use(
       http.get(`${TIDAL_API_BASE}/playlists`, () => new HttpResponse(null, { status: 401 })),
     );
-    const result = await bg.tidalFetch(`${TIDAL_API_BASE}/playlists`);
+    const result = await bg.handleGetPlaylists();
     expect(result).toEqual({ error: 'API error 401', status: 401 });
   });
 });
 
-describe('tidalFetch 429 retry', () => {
+describe('typed Tidal API client 429 retry', () => {
   it('retries once on 429 and returns success', async () => {
     vi.useFakeTimers();
     let calls = 0;
@@ -384,7 +432,7 @@ describe('tidalFetch 429 retry', () => {
         return HttpResponse.json({ data: [] });
       }),
     );
-    const promise = bg.tidalFetch(`${TIDAL_API_BASE}/playlists`);
+    const promise = bg.handleGetPlaylists();
     await vi.runAllTimersAsync();
     const result = await promise;
     expect(result).toEqual({ data: [] });
@@ -397,7 +445,7 @@ describe('tidalFetch 429 retry', () => {
     server.use(
       http.get(`${TIDAL_API_BASE}/playlists`, () => new HttpResponse(null, { status: 429 })),
     );
-    const promise = bg.tidalFetch(`${TIDAL_API_BASE}/playlists`);
+    const promise = bg.handleGetPlaylists();
     await vi.runAllTimersAsync();
     const result = await promise;
     expect(result).toEqual({ error: 'API error 429', status: 429 });
@@ -419,7 +467,7 @@ describe('tidalFetch 429 retry', () => {
         return HttpResponse.json({ data: [] });
       }),
     );
-    const promise = bg.tidalFetch(`${TIDAL_API_BASE}/playlists`);
+    const promise = bg.handleGetPlaylists();
     await vi.advanceTimersByTimeAsync(5000);
     const result = await promise;
     expect(result).toEqual({ data: [] });
@@ -437,7 +485,7 @@ describe('tidalFetch 429 retry', () => {
         return HttpResponse.json({ data: [] });
       }),
     );
-    const promise = bg.tidalFetch(`${TIDAL_API_BASE}/playlists`);
+    const promise = bg.handleGetPlaylists();
     // First computed backoff is (0 + 1) * 3000 = 3000ms
     await vi.advanceTimersByTimeAsync(3000);
     const result = await promise;
@@ -454,7 +502,7 @@ describe('tidalFetch 429 retry', () => {
         return new HttpResponse(null, { status: 401 });
       }),
     );
-    const result = await bg.tidalFetch(`${TIDAL_API_BASE}/playlists`);
+    const result = await bg.handleGetPlaylists();
     expect(result).toEqual({ error: 'API error 401', status: 401 });
     expect(calls).toBe(1);
   });

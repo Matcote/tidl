@@ -1,6 +1,8 @@
 // tIDl — Background Service Worker
 // Handles: context menu, OAuth token management, Tidal API calls
 
+import { createAPIClient } from '@tidal-music/api';
+import type { components } from '@tidal-music/api';
 import { TIDAL_API_BASE } from './shared/constants';
 import { initAuth, credentialsProvider } from './shared/auth';
 import type {
@@ -13,6 +15,20 @@ import type {
   FavoritesResponse,
   CredentialsResponse,
 } from './shared/types';
+
+type TidalApiClient = ReturnType<typeof createAPIClient>;
+type TidalApiResult<T> = {
+  data?: T;
+  error?: unknown;
+  response: Response;
+};
+type SearchDocument = components['schemas']['SearchResults_Single_Resource_Data_Document'];
+type PlaylistsDocument = components['schemas']['Playlists_Multi_Resource_Data_Document'];
+type RelationshipItemsDocument =
+  | components['schemas']['Playlists_Items_Multi_Relationship_Data_Document']
+  | components['schemas']['UserCollectionTracks_Items_Multi_Relationship_Data_Document'];
+
+let apiClient: TidalApiClient | null = null;
 
 // ─── Context Menu Setup ──────────────────────────────────────────────────────
 
@@ -76,7 +92,7 @@ chrome.runtime.onMessage.addListener((msg: ExtensionMessage, _sender, sendRespon
       handleAddToPlaylist(msg.trackId, msg.playlistId).then(sendResponse);
       return true;
     case 'GET_FAVORITES':
-      handleGetFavorites().then(sendResponse);
+      handleGetFavorites(msg.forceRefresh).then(sendResponse);
       return true;
     case 'GET_CREDENTIALS':
       handleGetCredentials().then(sendResponse);
@@ -118,9 +134,17 @@ async function handleGetCredentials(): Promise<CredentialsResponse> {
 export async function handleSearch(query: string): Promise<SearchResponse> {
   const stored = await chrome.storage.local.get('countryCode') as { countryCode?: string };
   const countryCode = stored.countryCode ?? 'CA';
-  const encoded = encodeURIComponent(query);
-  const url = `${TIDAL_API_BASE}/searchResults/${encoded}?countryCode=${countryCode}&include=tracks,tracks.artists,tracks.albums,tracks.albums.coverArt`;
-  const result = await tidalFetch(url);
+  const result = await tidalApiRequest<SearchDocument>(() =>
+    getApiClient().GET('/searchResults/{id}', {
+      params: {
+        path: { id: query },
+        query: {
+          countryCode,
+          include: ['tracks', 'tracks.artists', 'tracks.albums', 'tracks.albums.coverArt'],
+        },
+      },
+    }),
+  );
   console.log('[tidl] Search result:', JSON.stringify(result).slice(0, 500));
   return result as SearchResponse;
 }
@@ -128,8 +152,16 @@ export async function handleSearch(query: string): Promise<SearchResponse> {
 export async function handleGetPlaylists(): Promise<PlaylistsResponse> {
   const stored = await chrome.storage.local.get('countryCode') as { countryCode?: string };
   const countryCode = stored.countryCode ?? 'CA';
-  const url = `${TIDAL_API_BASE}/playlists?filter[owners.id]=me&countryCode=${countryCode}`;
-  const result = await tidalFetch(url) as PlaylistsResponse;
+  const result = await tidalApiRequest<PlaylistsDocument>(() =>
+    getApiClient().GET('/playlists', {
+      params: {
+        query: {
+          countryCode,
+          'filter[owners.id]': ['me'],
+        },
+      },
+    }),
+  ) as PlaylistsResponse;
   console.log('[tidl] Playlists result:', JSON.stringify(result).slice(0, 500));
   return result;
 }
@@ -157,23 +189,30 @@ export async function handleGetPlaylistTracks(playlistIds: string[]): Promise<Pl
 
     for (const playlistId of playlistIds) {
       const ids: string[] = [];
-      let url: string | null =
-        `${TIDAL_API_BASE}/playlists/${playlistId}/relationships/items?countryCode=${countryCode}&page[limit]=100`;
+      let cursor: string | undefined;
 
-      while (url) {
-        const result = await tidalFetch(url) as Record<string, unknown>;
-        if ('error' in result) break;
+      do {
+        const result = await tidalApiRequest<RelationshipItemsDocument>(() =>
+          getApiClient().GET('/playlists/{id}/relationships/items', {
+            params: {
+              path: { id: playlistId },
+              query: {
+                countryCode,
+                ...(cursor ? { 'page[cursor]': cursor } : {}),
+              },
+            },
+          }),
+        ) as RelationshipItemsDocument | MutationResponse;
+        if (isMutationResponse(result)) break;
 
-        const data = result.data as Array<{ id: string }> | undefined;
-        if (data) for (const item of data) ids.push(item.id);
+        ids.push(...extractRelationshipIds(result));
 
-        const next = (result as { links?: { next?: string } }).links?.next ?? null;
-        url = next ? (next.startsWith('http') ? next : `https://openapi.tidal.com/v2${next}`) : null;
-        if (url) await new Promise(r => setTimeout(r, 300));
-      }
+        cursor = getCursorFromNext(result.links?.next);
+        if (cursor) await delay(300);
+      } while (cursor);
 
       trackMap[playlistId] = ids;
-      await new Promise(r => setTimeout(r, 300)); // rate-limit between playlists
+      await delay(300); // rate-limit between playlists
     }
 
     await chrome.storage.local.set({ playlistTrackMap: trackMap, playlistTracksFetched: Date.now() });
@@ -185,13 +224,17 @@ export async function handleGetPlaylistTracks(playlistIds: string[]): Promise<Pl
 }
 
 export async function handleAddFavorite(trackId: string): Promise<MutationResponse> {
-  const stored = await chrome.storage.local.get(['userId', 'countryCode']) as { userId?: string; countryCode?: string };
+  const stored = await chrome.storage.local.get('countryCode') as { countryCode?: string };
   const countryCode = stored.countryCode ?? 'CA';
-  const url = `${TIDAL_API_BASE}/userCollections/${stored.userId}/relationships/tracks?countryCode=${countryCode}`;
-  const result = await tidalFetch(url, {
-    method: 'POST',
-    body: JSON.stringify({ data: [{ id: String(trackId), type: 'tracks' }] }),
-  }) as MutationResponse;
+  const result = await tidalApiMutation(() =>
+    getApiClient().POST('/userCollectionTracks/{id}/relationships/items', {
+      params: {
+        path: { id: 'me' },
+        query: { countryCode },
+      },
+      body: { data: [{ id: String(trackId), type: 'tracks' }] },
+    }),
+  );
 
   // Optimistically update the cached favorites
   if (!result.error) {
@@ -207,13 +250,12 @@ export async function handleAddFavorite(trackId: string): Promise<MutationRespon
 }
 
 export async function handleRemoveFavorite(trackId: string): Promise<MutationResponse> {
-  const stored = await chrome.storage.local.get(['userId', 'countryCode']) as { userId?: string; countryCode?: string };
-  const countryCode = stored.countryCode ?? 'CA';
-  const url = `${TIDAL_API_BASE}/userCollections/${stored.userId}/relationships/tracks?countryCode=${countryCode}`;
-  const result = await tidalFetch(url, {
-    method: 'DELETE',
-    body: JSON.stringify({ data: [{ id: String(trackId), type: 'tracks' }] }),
-  }) as MutationResponse;
+  const result = await tidalApiMutation(() =>
+    getApiClient().DELETE('/userCollectionTracks/{id}/relationships/items', {
+      params: { path: { id: 'me' } },
+      body: { data: [{ id: String(trackId), type: 'tracks' }] },
+    }),
+  );
 
   if (!result.error) {
     const cache = await chrome.storage.local.get('favoritedTrackIds') as { favoritedTrackIds?: string[] };
@@ -227,11 +269,15 @@ export async function handleRemoveFavorite(trackId: string): Promise<MutationRes
 export async function handleAddToPlaylist(trackId: string, playlistId: string): Promise<MutationResponse> {
   const stored = await chrome.storage.local.get('countryCode') as { countryCode?: string };
   const countryCode = stored.countryCode ?? 'CA';
-  const url = `${TIDAL_API_BASE}/playlists/${playlistId}/relationships/items?countryCode=${countryCode}`;
-  const result = await tidalFetch(url, {
-    method: 'POST',
-    body: JSON.stringify({ data: [{ id: String(trackId), type: 'tracks' }] }),
-  }) as MutationResponse;
+  const result = await tidalApiMutation(() =>
+    getApiClient().POST('/playlists/{id}/relationships/items', {
+      params: {
+        path: { id: playlistId },
+        query: { countryCode },
+      },
+      body: { data: [{ id: String(trackId), type: 'tracks' }] },
+    }),
+  );
 
   // Optimistically update the cached playlist track map
   if (!result.error) {
@@ -252,43 +298,39 @@ export async function handleAddToPlaylist(trackId: string, playlistId: string): 
 const FAVORITES_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 async function fetchAllFavoriteIds(): Promise<string[]> {
-  const stored = await chrome.storage.local.get(['userId', 'countryCode']) as {
-    userId?: string; countryCode?: string;
-  };
-  if (!stored.userId) return [];
+  const stored = await chrome.storage.local.get('countryCode') as { countryCode?: string };
   const countryCode = stored.countryCode ?? 'CA';
 
   const ids: string[] = [];
-  // Request max page size to minimize number of requests
-  let url: string | null =
-    `${TIDAL_API_BASE}/userCollections/${stored.userId}/relationships/tracks?countryCode=${countryCode}&page[limit]=100`;
+  let cursor: string | undefined;
   let pages = 0;
   const MAX_PAGES = 200;
 
-  while (url && pages < MAX_PAGES) {
-    const result = await tidalFetch(url) as Record<string, unknown>;
+  do {
+    const result = await tidalApiRequest<RelationshipItemsDocument>(() =>
+      getApiClient().GET('/userCollectionTracks/{id}/relationships/items', {
+        params: {
+          path: { id: 'me' },
+          query: {
+            countryCode,
+            ...(cursor ? { 'page[cursor]': cursor } : {}),
+          },
+        },
+      }),
+    ) as RelationshipItemsDocument | MutationResponse;
 
-    if ('error' in result) {
+    if (isMutationResponse(result)) {
       console.warn('[tidl] Favorites fetch error:', result.error);
       break;
     }
 
-    const data = result.data as Array<{ id: string }> | undefined;
-    if (data) {
-      for (const item of data) ids.push(item.id);
-    }
+    ids.push(...extractRelationshipIds(result));
 
-    // Follow pagination — next may be relative or absolute
-    const next = (result as { links?: { next?: string } }).links?.next ?? null;
-    if (next) {
-      url = next.startsWith('http') ? next : `https://openapi.tidal.com/v2${next}`;
-    } else {
-      url = null;
-    }
+    cursor = getCursorFromNext(result.links?.next);
 
     pages++;
-    if (url) await new Promise(r => setTimeout(r, 500)); // rate-limit protection
-  }
+    if (cursor) await delay(500); // rate-limit protection
+  } while (cursor && pages < MAX_PAGES);
 
   // Only cache if we actually fetched at least one page successfully
   if (pages > 0) {
@@ -300,7 +342,7 @@ async function fetchAllFavoriteIds(): Promise<string[]> {
   return ids;
 }
 
-async function handleGetFavorites(): Promise<FavoritesResponse> {
+export async function handleGetFavorites(forceRefresh = false): Promise<FavoritesResponse> {
   try {
     const token = await getValidToken();
     if (!token) return { trackIds: [] };
@@ -310,6 +352,7 @@ async function handleGetFavorites(): Promise<FavoritesResponse> {
     };
 
     if (
+      !forceRefresh &&
       stored.favoritedTrackIds &&
       stored.favoritesLastFetched &&
       Date.now() - stored.favoritesLastFetched < FAVORITES_CACHE_TTL
@@ -325,50 +368,82 @@ async function handleGetFavorites(): Promise<FavoritesResponse> {
   }
 }
 
-// ─── Authenticated Fetch ─────────────────────────────────────────────────────
+// ─── Authenticated API Client ────────────────────────────────────────────────
 
-export async function tidalFetch(
-  url: string,
-  options: RequestInit = {},
-): Promise<SearchResponse | PlaylistsResponse | MutationResponse> {
+function getApiClient(): TidalApiClient {
+  if (apiClient) return apiClient;
+
+  apiClient = createAPIClient(credentialsProvider);
+  apiClient.use({
+    onRequest({ request }) {
+      request.headers.set('Accept', 'application/vnd.api+json');
+      return request;
+    },
+  });
+
+  return apiClient;
+}
+
+async function tidalApiRequest<T>(
+  operation: () => Promise<TidalApiResult<T>>,
+): Promise<T | MutationResponse> {
   const MAX_ATTEMPTS = 3;
 
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     const token = await getValidToken();
     if (!token) return { error: 'Not authenticated' };
 
-    const res = await fetch(url, {
-      ...options,
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/vnd.api+json',
-        Accept: 'application/vnd.api+json',
-        ...(options.headers ?? {}),
-      },
-    });
+    const result = await operation();
+    const { response } = result;
 
-    if (res.status === 429) {
+    if (response.status === 429) {
       if (attempt === MAX_ATTEMPTS - 1) break;
-      const retryAfterRaw = parseInt(res.headers.get('Retry-After') ?? '', 10);
+      const retryAfterRaw = parseInt(response.headers.get('Retry-After') ?? '', 10);
       const wait = Number.isFinite(retryAfterRaw) && retryAfterRaw > 0
         ? retryAfterRaw * 1000
         : (attempt + 1) * 3000;
       console.warn(`[tidl] Rate limited, retrying in ${wait / 1000}s... (attempt ${attempt + 1}/${MAX_ATTEMPTS})`);
-      await new Promise(r => setTimeout(r, wait));
+      await delay(wait);
       continue;
     }
 
-    if (!res.ok) {
-      return { error: `API error ${res.status}`, status: res.status };
+    if (!response.ok) {
+      return { error: `API error ${response.status}`, status: response.status };
     }
 
-    // Mutation endpoints may return 200, 201, 202, or 204 with no body
-    const text = await res.text();
-    if (!text) return { ok: true };
-    return JSON.parse(text) as SearchResponse | PlaylistsResponse | MutationResponse;
+    return result.data ?? { ok: true };
   }
 
   return { error: 'API error 429', status: 429 };
+}
+
+async function tidalApiMutation(
+  operation: () => Promise<TidalApiResult<unknown>>,
+): Promise<MutationResponse> {
+  const result = await tidalApiRequest(operation);
+  if (isMutationResponse(result)) return result;
+  return { ok: true };
+}
+
+function isMutationResponse(value: unknown): value is MutationResponse {
+  return typeof value === 'object' && value !== null && 'error' in value;
+}
+
+function extractRelationshipIds(document: RelationshipItemsDocument): string[] {
+  return (document.data ?? []).map(item => item.id);
+}
+
+function getCursorFromNext(next: string | undefined): string | undefined {
+  if (!next) return undefined;
+  try {
+    return new URL(next, TIDAL_API_BASE).searchParams.get('page[cursor]') ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 // ─── Token Management ────────────────────────────────────────────────────────

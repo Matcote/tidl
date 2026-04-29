@@ -15,11 +15,14 @@ export const handlers = [
   http.get(`${TIDAL_API_BASE}/playlists`, () =>
     HttpResponse.json({ data: [] }),
   ),
-  http.post(`${TIDAL_API_BASE}/userCollections/:userId/relationships/tracks`, () =>
+  http.post(`${TIDAL_API_BASE}/userCollectionTracks/:collectionId/relationships/items`, () =>
     new HttpResponse(null, { status: 204 }),
   ),
-  http.delete(`${TIDAL_API_BASE}/userCollections/:userId/relationships/tracks`, () =>
+  http.delete(`${TIDAL_API_BASE}/userCollectionTracks/:collectionId/relationships/items`, () =>
     new HttpResponse(null, { status: 204 }),
+  ),
+  http.get(`${TIDAL_API_BASE}/userCollectionTracks/:collectionId/relationships/items`, () =>
+    HttpResponse.json({ data: [], links: {} }),
   ),
   http.post(`${TIDAL_API_BASE}/playlists/:playlistId/relationships/items`, () =>
     new HttpResponse(null, { status: 204 }),

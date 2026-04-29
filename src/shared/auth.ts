@@ -42,7 +42,7 @@ export async function initAuth(): Promise<void> {
   const clientUniqueKey = await getClientUniqueKey();
   await init({
     clientId: CLIENT_ID,
-    clientSecret: CLIENT_SECRET || undefined,
+    ...(CLIENT_SECRET ? { clientSecret: CLIENT_SECRET } : {}),
     clientUniqueKey,
     credentialsStorageKey: STORAGE_KEY,
     scopes: SCOPES.split(' '),
