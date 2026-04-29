@@ -140,6 +140,82 @@ describe('handleGetPlaylists', () => {
     const result = await bg.handleGetPlaylists();
     expect(result).toEqual(fixture);
   });
+
+  it('follows playlist pagination', async () => {
+    vi.useFakeTimers();
+    const cursors: Array<string | null> = [];
+
+    server.use(
+      http.get(`${TIDAL_API_BASE}/playlists`, ({ request }) => {
+        const cursor = new URL(request.url).searchParams.get('page[cursor]');
+        cursors.push(cursor);
+
+        if (!cursor) {
+          return HttpResponse.json({
+            data: [{ id: 'pl1', type: 'playlists' }],
+            links: {
+              next: `${TIDAL_API_BASE}/playlists?page[cursor]=next-page`,
+            },
+          });
+        }
+
+        return HttpResponse.json({
+          data: [{ id: 'pl2', type: 'playlists' }],
+          links: {},
+        });
+      }),
+    );
+
+    const promise = bg.handleGetPlaylists();
+    await vi.advanceTimersByTimeAsync(300);
+    const result = await promise;
+
+    expect(result.data?.map(p => p.id)).toEqual(['pl1', 'pl2']);
+    expect(cursors).toEqual([null, 'next-page']);
+    vi.useRealTimers();
+  });
+
+  it('returns cached playlists without hitting the network when fresh', async () => {
+    const cached = [{ id: 'cached-pl', type: 'playlists', attributes: { name: 'Cached' } }];
+    seedLocalStorage({
+      playlistsCache: cached,
+      playlistsLastFetched: Date.now(),
+    });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    const result = await bg.handleGetPlaylists();
+
+    expect(result.data).toEqual(cached);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('force refresh bypasses the playlist cache', async () => {
+    seedLocalStorage({
+      playlistsCache: [{ id: 'cached-pl', type: 'playlists' }],
+      playlistsLastFetched: Date.now(),
+    });
+
+    server.use(
+      http.get(`${TIDAL_API_BASE}/playlists`, () =>
+        HttpResponse.json({ data: [{ id: 'fresh-pl', type: 'playlists' }] }),
+      ),
+    );
+
+    const result = await bg.handleGetPlaylists(true);
+    expect(result.data?.map(p => p.id)).toEqual(['fresh-pl']);
+    expect(getLocalStore()['playlistsCache']).toEqual([{ id: 'fresh-pl', type: 'playlists' }]);
+  });
+
+  it('falls back to cached playlists when refresh fails', async () => {
+    const cached = [{ id: 'cached-pl', type: 'playlists' }];
+    seedLocalStorage({ playlistsCache: cached, playlistsLastFetched: Date.now() - 25 * 60 * 60 * 1000 });
+    server.use(
+      http.get(`${TIDAL_API_BASE}/playlists`, () => new HttpResponse(null, { status: 500 })),
+    );
+
+    const result = await bg.handleGetPlaylists(true);
+    expect(result.data).toEqual(cached);
+  });
 });
 
 describe('handleAddFavorite', () => {
@@ -276,102 +352,15 @@ describe('handleAddToPlaylist', () => {
     expect(result).toEqual({ ok: true });
   });
 
-  it('optimistically adds trackId to playlistTrackMap cache on success', async () => {
-    await bg.handleAddToPlaylist('track-1', 'pl-42');
-
-    const store = getLocalStore();
-    expect((store['playlistTrackMap'] as Record<string, string[]>)?.['pl-42']).toContain('track-1');
-  });
-
-  it('does not duplicate trackId if already in cache', async () => {
-    seedLocalStorage({
-      playlistTrackMap: { 'pl-42': ['track-1'] },
-    });
-
-    await bg.handleAddToPlaylist('track-1', 'pl-42');
-
-    const map = getLocalStore()['playlistTrackMap'] as Record<string, string[]>;
-    expect(map['pl-42'].filter((id: string) => id === 'track-1')).toHaveLength(1);
-  });
-
-  it('does not update cache on API error', async () => {
+  it('treats duplicate playlist item response as success', async () => {
     server.use(
       http.post(`${TIDAL_API_BASE}/playlists/:playlistId/relationships/items`, () =>
-        new HttpResponse(null, { status: 500 }),
+        new HttpResponse(null, { status: 409 }),
       ),
     );
 
-    await bg.handleAddToPlaylist('track-1', 'pl-42');
-
-    expect(getLocalStore()['playlistTrackMap']).toBeUndefined();
-  });
-});
-
-describe('handleGetPlaylistTracks', () => {
-  it('fetches items for each playlist ID and returns trackMap', async () => {
-    seedLocalStorage({ countryCode: 'US' });
-
-    server.use(
-      http.get(`${TIDAL_API_BASE}/playlists/:playlistId/relationships/items`, ({ params }) => {
-        if (params['playlistId'] === 'pl-1') {
-          return HttpResponse.json({ data: [{ id: 'track-a', type: 'tracks' }, { id: 'track-b', type: 'tracks' }] });
-        }
-        return HttpResponse.json({ data: [{ id: 'track-c', type: 'tracks' }] });
-      }),
-    );
-
-    const result = await bg.handleGetPlaylistTracks(['pl-1', 'pl-2']);
-    expect(result.trackMap?.['pl-1']).toEqual(['track-a', 'track-b']);
-    expect(result.trackMap?.['pl-2']).toEqual(['track-c']);
-  });
-
-  it('caches the result in local storage', async () => {
-    await bg.handleGetPlaylistTracks(['pl-1']);
-
-    const store = getLocalStore();
-    expect(store['playlistTrackMap']).toBeDefined();
-    expect(typeof store['playlistTracksFetched']).toBe('number');
-  });
-
-  it('returns cached result without hitting the network when fresh', async () => {
-    const cachedMap = { 'pl-1': ['track-x', 'track-y'] };
-    seedLocalStorage({
-      playlistTrackMap: cachedMap,
-      playlistTracksFetched: Date.now(),
-    });
-
-    const fetchSpy = vi.spyOn(globalThis, 'fetch');
-    const result = await bg.handleGetPlaylistTracks(['pl-1']);
-
-    expect(result.trackMap).toEqual(cachedMap);
-    expect(fetchSpy).not.toHaveBeenCalled();
-  });
-
-  it('re-fetches when cache is older than 30 minutes', async () => {
-    seedLocalStorage({
-      playlistTrackMap: { 'pl-1': ['stale-track'] },
-      playlistTracksFetched: Date.now() - 31 * 60 * 1000,
-    });
-
-    server.use(
-      http.get(`${TIDAL_API_BASE}/playlists/:playlistId/relationships/items`, () =>
-        HttpResponse.json({ data: [{ id: 'fresh-track', type: 'tracks' }] }),
-      ),
-    );
-
-    const result = await bg.handleGetPlaylistTracks(['pl-1']);
-    expect(result.trackMap?.['pl-1']).toEqual(['fresh-track']);
-  });
-
-  it('returns empty trackMap on network error', async () => {
-    server.use(
-      http.get(`${TIDAL_API_BASE}/playlists/:playlistId/relationships/items`, () =>
-        new HttpResponse(null, { status: 500 }),
-      ),
-    );
-
-    const result = await bg.handleGetPlaylistTracks(['pl-1']);
-    expect(result.trackMap).toEqual({ 'pl-1': [] });
+    const result = await bg.handleAddToPlaylist('track-1', 'pl-42');
+    expect(result).toEqual({ ok: true });
   });
 });
 

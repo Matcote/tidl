@@ -128,10 +128,13 @@ describe('toggleFavorite', () => {
 });
 
 describe('togglePlaylistPicker', () => {
-  it('flashes empty class when playlists array is empty', () => {
+  it('flashes empty class when playlists array is empty', async () => {
+    (chrome.runtime.sendMessage as ReturnType<typeof vi.fn>).mockResolvedValue({ data: [] });
     const btn = makeButton();
     const e = new MouseEvent('click');
     togglePlaylistPicker(e, 'track-1', btn);
+    await new Promise(resolve => setTimeout(resolve, 0));
     expect(btn.classList.contains('btn-pl-empty')).toBe(true);
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({ type: 'GET_PLAYLISTS', forceRefresh: true });
   });
 });

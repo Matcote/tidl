@@ -4,7 +4,7 @@ import { extractTracks } from '../shared/tracks';
 import { escapeHtml, openTidalLink } from '../shared/utils';
 import { createPlayer } from '../shared/player';
 import type { Player } from '../shared/player';
-import type { Track, Playlist, PlaylistsResponse, PlaylistTracksResponse, SearchResponse, FavoritesResponse, MutationResponse } from '../shared/types';
+import type { Track, Playlist, PlaylistsResponse, SearchResponse, FavoritesResponse, MutationResponse } from '../shared/types';
 
 const stateLoading = document.getElementById('state-loading') as HTMLElement;
 const stateEmpty = document.getElementById('state-empty') as HTMLElement;
@@ -17,7 +17,6 @@ const playlistList = document.getElementById('playlist-list') as HTMLElement;
 
 let playlists: Playlist[] = [];
 let activePlBtn: HTMLButtonElement | null = null;
-let playlistTrackMap: Record<string, string[]> = {};
 const addedMap = new Map<string, Set<string>>();
 
 const player: Player = createPlayer('rp');
@@ -48,24 +47,7 @@ async function init(): Promise<void> {
 
   queryLabel.textContent = tidlQuery;
 
-  const [searchResult, playlistResult] = await Promise.all([
-    chrome.runtime.sendMessage({ type: 'SEARCH', query: tidlQuery }) as Promise<SearchResponse>,
-    chrome.runtime.sendMessage({ type: 'GET_PLAYLISTS' }) as Promise<PlaylistsResponse>,
-  ]);
-
-  if (playlistResult.data) {
-    playlists = playlistResult.data.map(p => ({
-      id: p.id,
-      name: (p.attributes?.['title'] as string | undefined) ?? 'Untitled Playlist',
-    }));
-    // Fetch which tracks are in each playlist (cached after first load)
-    (chrome.runtime.sendMessage({
-      type: 'GET_PLAYLIST_TRACKS',
-      playlistIds: playlists.map(p => p.id),
-    }) as Promise<PlaylistTracksResponse>).then(result => {
-      if (result.trackMap) playlistTrackMap = result.trackMap;
-    }).catch(() => {});
-  }
+  const searchResult = await chrome.runtime.sendMessage({ type: 'SEARCH', query: tidlQuery }) as SearchResponse;
 
   if (searchResult.error) {
     showError(searchResult.error);
@@ -246,13 +228,10 @@ export async function toggleFavorite(trackId: string, btn: HTMLButtonElement): P
 
 export function togglePlaylistPicker(e: MouseEvent, trackId: string, btn: HTMLButtonElement): void {
   e.stopPropagation();
+  void openPlaylistPicker(trackId, btn);
+}
 
-  if (!playlists.length) {
-    btn.classList.add('btn-pl-empty');
-    setTimeout(() => { btn.classList.remove('btn-pl-empty'); }, 2000);
-    return;
-  }
-
+async function openPlaylistPicker(trackId: string, btn: HTMLButtonElement): Promise<void> {
   // Close if same button triggered again
   if (activePlBtn === btn && !playlistPicker.classList.contains('hidden')) {
     playlistPicker.classList.add('hidden');
@@ -260,12 +239,26 @@ export function togglePlaylistPicker(e: MouseEvent, trackId: string, btn: HTMLBu
     return;
   }
 
+  btn.disabled = true;
+  try {
+    await refreshPlaylists();
+  } catch {
+    playlists = [];
+  } finally {
+    btn.disabled = false;
+  }
+
+  if (!playlists.length) {
+    btn.classList.add('btn-pl-empty');
+    setTimeout(() => { btn.classList.remove('btn-pl-empty'); }, 2000);
+    return;
+  }
+
   activePlBtn = btn;
   playlistList.innerHTML = '';
 
   for (const playlist of playlists) {
-    const alreadyIn = (playlistTrackMap[playlist.id]?.includes(trackId) ?? false)
-      || (addedMap.get(trackId)?.has(playlist.id) ?? false);
+    const alreadyIn = addedMap.get(trackId)?.has(playlist.id) ?? false;
     const li = document.createElement('li');
     if (alreadyIn) {
       li.classList.add('pl-added');
@@ -310,6 +303,25 @@ export function togglePlaylistPicker(e: MouseEvent, trackId: string, btn: HTMLBu
   playlistPicker.style.top = `${rect.bottom + 4}px`;
   playlistPicker.style.right = `${document.body.clientWidth - rect.right}px`;
   playlistPicker.classList.remove('hidden');
+}
+
+async function refreshPlaylists(): Promise<void> {
+  const result = await chrome.runtime.sendMessage({ type: 'GET_PLAYLISTS', forceRefresh: true }) as PlaylistsResponse;
+  if (!result.data) {
+    playlists = [];
+    return;
+  }
+
+  playlists = result.data.map(p => ({
+    id: p.id,
+    name: getPlaylistName(p.attributes),
+  }));
+}
+
+function getPlaylistName(attributes: Record<string, unknown> | undefined): string {
+  return (attributes?.['name'] as string | undefined)
+    ?? (attributes?.['title'] as string | undefined)
+    ?? 'Untitled Playlist';
 }
 
 // Close picker when clicking outside

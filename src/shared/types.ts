@@ -1,8 +1,7 @@
 // Discriminated union for chrome.runtime.sendMessage
 export type ExtensionMessage =
   | { type: 'SEARCH'; query: string }
-  | { type: 'GET_PLAYLISTS' }
-  | { type: 'GET_PLAYLIST_TRACKS'; playlistIds: string[] }
+  | { type: 'GET_PLAYLISTS'; forceRefresh?: boolean }
   | { type: 'ADD_FAVORITE'; trackId: string }
   | { type: 'REMOVE_FAVORITE'; trackId: string }
   | { type: 'ADD_TO_PLAYLIST'; trackId: string; playlistId: string }
@@ -31,7 +30,6 @@ export interface TidalJsonApiResource {
 }
 export interface SearchResponse { error?: string; data?: TidalJsonApiResource[]; included?: TidalJsonApiResource[] }
 export interface PlaylistsResponse { error?: string; data?: TidalJsonApiResource[] }
-export interface PlaylistTracksResponse { error?: string; trackMap?: Record<string, string[]> }
 export interface MutationResponse { ok?: true; error?: string; status?: number }
 export interface FavoritesResponse { error?: string; trackIds?: string[] }
 export interface CredentialsResponse { token?: string | undefined; clientId?: string | undefined; userId?: string | undefined; error?: string | undefined }
@@ -47,6 +45,6 @@ export interface LocalStorage {
   accessToken?: string; refreshToken?: string; expiresAt?: number;
   userId?: string; tidalUsername?: string; countryCode?: string; selectionPopup?: boolean;
   favoritedTrackIds?: string[]; favoritesLastFetched?: number;
-  playlistTrackMap?: Record<string, string[]>; playlistTracksFetched?: number;
+  playlistsCache?: TidalJsonApiResource[]; playlistsLastFetched?: number;
 }
 export interface SessionStorage { tidlQuery?: string }

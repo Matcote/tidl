@@ -6,13 +6,12 @@ import { extractTracks } from './shared/tracks';
 import { escapeHtml, openTidalLink } from './shared/utils';
 import { createPlayer } from './shared/player';
 import type { Player } from './shared/player';
-import type { Track, Playlist, PlaylistsResponse, PlaylistTracksResponse, SearchResponse, FavoritesResponse, MutationResponse } from './shared/types';
+import type { Track, Playlist, PlaylistsResponse, SearchResponse, FavoritesResponse, MutationResponse } from './shared/types';
 
 let tidalPopupBtn: HTMLButtonElement | null = null;
 let tidalPanel: HTMLDivElement | null = null;
 let panelPlaylists: Playlist[] = [];
 let panelActivePlBtn: HTMLButtonElement | null = null;
-let panelPlaylistTrackMap: Record<string, string[]> = {};
 const panelAddedMap = new Map<string, Set<string>>();
 let player: Player | null = null;
 
@@ -54,7 +53,6 @@ function removePanel(): void {
   plPicker.classList.add('tidp-hidden');
   panelActivePlBtn = null;
   panelPlaylists = [];
-  panelPlaylistTrackMap = {};
   panelAddedMap.clear();
 }
 
@@ -318,29 +316,12 @@ function revealBody(bodyEl?: HTMLElement, overlay?: HTMLElement): void {
 }
 
 async function doSearch(query: string, bodyEl?: HTMLElement, overlay?: HTMLElement): Promise<void> {
-  let searchResult: SearchResponse, playlistResult: PlaylistsResponse;
+  let searchResult: SearchResponse;
   try {
-    [searchResult, playlistResult] = await Promise.all([
-      chrome.runtime.sendMessage({ type: 'SEARCH', query }) as Promise<SearchResponse>,
-      chrome.runtime.sendMessage({ type: 'GET_PLAYLISTS' }) as Promise<PlaylistsResponse>,
-    ]);
+    searchResult = await chrome.runtime.sendMessage({ type: 'SEARCH', query }) as SearchResponse;
   } catch { removePanel(); return; }
 
   if (!tidalPanel) return; // closed while searching
-
-  if (playlistResult.data) {
-    panelPlaylists = playlistResult.data.map(p => ({
-      id: p.id,
-      name: (p.attributes?.['name'] as string | undefined) ?? 'Untitled Playlist',
-    }));
-    // Fetch which tracks are in each playlist (cached after first load)
-    (chrome.runtime.sendMessage({
-      type: 'GET_PLAYLIST_TRACKS',
-      playlistIds: panelPlaylists.map(p => p.id),
-    }) as Promise<PlaylistTracksResponse>).then(result => {
-      if (result.trackMap) panelPlaylistTrackMap = result.trackMap;
-    }).catch(() => {});
-  }
 
   const loading = tidalPanel.querySelector('.tidp-loading')!;
   const results = tidalPanel.querySelector<HTMLUListElement>('.tidp-results')!;
@@ -545,6 +526,26 @@ export function togglePlaylistPickerInline(
   trackId: string,
   btn: HTMLButtonElement,
 ): void {
+  void openPlaylistPickerInline(trackId, btn);
+}
+
+async function openPlaylistPickerInline(trackId: string, btn: HTMLButtonElement): Promise<void> {
+  if (!tidalPanel) return;
+
+  if (panelActivePlBtn === btn && !plPicker.classList.contains('tidp-hidden')) {
+    plPicker.classList.add('tidp-hidden');
+    panelActivePlBtn = null;
+    return;
+  }
+
+  btn.disabled = true;
+  try {
+    await refreshPanelPlaylists();
+  } catch {
+    panelPlaylists = [];
+  } finally {
+    btn.disabled = false;
+  }
   if (!tidalPanel) return;
 
   if (!panelPlaylists.length) {
@@ -553,18 +554,11 @@ export function togglePlaylistPickerInline(
     return;
   }
 
-  if (panelActivePlBtn === btn && !plPicker.classList.contains('tidp-hidden')) {
-    plPicker.classList.add('tidp-hidden');
-    panelActivePlBtn = null;
-    return;
-  }
-
   panelActivePlBtn = btn;
   plPickerList.innerHTML = '';
 
   for (const playlist of panelPlaylists) {
-    const alreadyIn = (panelPlaylistTrackMap[playlist.id]?.includes(trackId) ?? false)
-      || (panelAddedMap.get(trackId)?.has(playlist.id) ?? false);
+    const alreadyIn = panelAddedMap.get(trackId)?.has(playlist.id) ?? false;
     const li = document.createElement('li');
     if (alreadyIn) {
       li.classList.add('tidp-pl-added');
@@ -604,4 +598,23 @@ export function togglePlaylistPickerInline(
   plPicker.style.right = `${window.innerWidth - btnRect.right}px`;
   document.documentElement.appendChild(plPicker); // ensure it's last in DOM so it stacks above the panel
   plPicker.classList.remove('tidp-hidden');
+}
+
+async function refreshPanelPlaylists(): Promise<void> {
+  const result = await chrome.runtime.sendMessage({ type: 'GET_PLAYLISTS', forceRefresh: true }) as PlaylistsResponse;
+  if (!result.data) {
+    panelPlaylists = [];
+    return;
+  }
+
+  panelPlaylists = result.data.map(p => ({
+    id: p.id,
+    name: getPlaylistName(p.attributes),
+  }));
+}
+
+function getPlaylistName(attributes: Record<string, unknown> | undefined): string {
+  return (attributes?.['name'] as string | undefined)
+    ?? (attributes?.['title'] as string | undefined)
+    ?? 'Untitled Playlist';
 }
