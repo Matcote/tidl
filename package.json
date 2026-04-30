@@ -1,10 +1,10 @@
 {
   "name": "tidl",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "scripts": {
     "build": "node build.js",
-    "package": "npm run build && cd dist && zip -r ../tidl-$npm_package_version.zip .",
+    "package": "npm run build && mkdir -p releases && rm -f releases/tidl-$npm_package_version.zip && cd dist && zip -r ../releases/tidl-$npm_package_version.zip .",
     "watch": "node build.js --watch",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",

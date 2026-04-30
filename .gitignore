@@ -3,3 +3,5 @@
 secrets.json
 node_modules/
 dist/
+releases/
+*.zip
