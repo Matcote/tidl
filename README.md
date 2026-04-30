@@ -2,6 +2,10 @@
 
 A Chrome extension for identifying tracks from DJ sets. Highlight text on any webpage to instantly search Tidal and manage your music library — add favorites, manage playlists — without leaving the page.
 
+## Demo
+
+![tIDl demo](docs/demo.gif)
+
 ## Features
 
 - Highlight any text → floating button appears → click to search Tidal inline
