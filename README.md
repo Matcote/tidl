@@ -4,7 +4,7 @@ A Chrome extension for identifying tracks from DJ sets. Highlight text on any we
 
 ## Demo
 
-![tIDl demo](docs/demo.gif)
+<img src="docs/demo.gif" alt="tIDl demo" width="520">
 
 ## Features
 
