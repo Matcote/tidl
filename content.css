@@ -57,7 +57,21 @@
   pointer-events: all;
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.4), 0 0 16px rgba(192, 132, 255, 0.12);
   box-sizing: border-box;
+  transform-origin: center;
+  animation: tidl-popup-arrive 0.52s cubic-bezier(0.2, 0.8, 0.2, 1);
   transition: border-color 0.16s ease, background 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
+}
+
+#tidl-popup::after {
+  content: '';
+  position: absolute;
+  inset: -5px;
+  border: 1px solid rgba(192, 132, 255, 0.32);
+  border-radius: 12px;
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(1);
+  animation: tidl-popup-halo 0.68s ease-out;
 }
 
 #tidl-popup:hover {
@@ -78,10 +92,44 @@
   filter: drop-shadow(0 0 4px rgba(192, 132, 255, 0.16));
 }
 
+@keyframes tidl-popup-arrive {
+  0% {
+    opacity: 0;
+    transform: translateY(4px) scale(0.985);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.28), 0 0 0 rgba(192, 132, 255, 0);
+  }
+  72% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    box-shadow: 0 11px 25px rgba(0, 0, 0, 0.42), 0 0 15px rgba(192, 132, 255, 0.15);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes tidl-popup-halo {
+  0% {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  45% {
+    opacity: 0.46;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.08);
+  }
+}
+
 /* Inline search panel */
 
 #tidl-panel {
   all: initial;
+  --tidp-panel-anchor: translateY(0);
+  --tidp-arrive-y: 3px;
+  --tidp-arrive-scale: 0.995;
   position: absolute;
   z-index: 2147483647;
   overflow: hidden;
@@ -93,15 +141,37 @@
   color: var(--text);
   font-family: var(--font);
   font-size: 13px;
+  opacity: 0;
   pointer-events: all;
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.4), 0 0 14px rgba(192, 132, 255, 0.05);
   box-sizing: border-box;
+  isolation: isolate;
+  transform: var(--tidp-panel-anchor) translateY(var(--tidp-arrive-y)) scale(var(--tidp-arrive-scale));
+  transform-origin: top left;
+  will-change: width, max-height, opacity, transform;
   transition:
     width 0.26s cubic-bezier(0.4, 0, 0.2, 1),
     max-height 0.38s 0.12s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.2s ease,
+    transform 0.32s cubic-bezier(0.22, 1, 0.36, 1),
     box-shadow 0.26s 0.18s ease,
     border-color 0.2s ease,
     background 0.2s ease;
+}
+
+#tidl-panel::before {
+  content: '';
+  position: absolute;
+  inset: -88px;
+  z-index: 0;
+  background-image: var(--tidp-panel-art-bg, none);
+  background-position: center;
+  background-size: cover;
+  filter: blur(42px) saturate(1.2) brightness(0.78);
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(1.04);
+  transition: opacity 0.34s ease;
 }
 
 #tidl-panel *,
@@ -111,19 +181,28 @@
 }
 
 #tidl-panel.tidp-open {
+  --tidp-arrive-y: 0px;
+  --tidp-arrive-scale: 1;
   width: min(400px, calc(100vw - 16px));
   max-height: 337px;
   border-color: rgba(192, 132, 255, 0.34);
   background: var(--surface);
+  opacity: 1;
   box-shadow: var(--shadow-panel);
 }
 
+#tidl-panel.tidp-has-aura::before {
+  opacity: 0.16;
+}
+
 #tidl-panel.tidp-above {
-  transform-origin: bottom center;
+  --tidp-panel-anchor: translateY(-100%);
+  transform-origin: bottom left;
 }
 
 .tidp-inner {
   position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   width: min(400px, calc(100vw - 16px));
@@ -344,11 +423,13 @@
 
 .tidp-results {
   margin: 0;
-  padding: 4px 0;
+  padding: 0 0 4px;
   list-style: none;
 }
 
 .tidp-track {
+  position: relative;
+  isolation: isolate;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -356,15 +437,61 @@
   padding: 8px 13px 8px 11px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.055);
   border-left: 2px solid transparent;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.004);
   transition: border-color 0.14s ease, background 0.14s ease, box-shadow 0.14s ease;
   animation: tidp-track-in 0.22s ease-out both;
   animation-delay: calc(var(--i, 0) * 35ms);
+}
+
+.tidp-track::before {
+  content: '';
+  position: absolute;
+  inset: -28px -58px;
+  z-index: 0;
+  background-image: var(--tidp-row-art-bg, none);
+  background-position: center;
+  background-size: cover;
+  filter: blur(18px) saturate(1.34) brightness(0.88);
+  opacity: 0.22;
+  pointer-events: none;
+  transform: scale(1.05);
+  transition: opacity 0.18s ease, transform 0.18s ease, filter 0.18s ease;
+}
+
+.tidp-track::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background:
+    linear-gradient(
+      90deg,
+      rgba(11, 13, 14, 0.78) 0%,
+      rgba(11, 13, 14, 0.7) 42%,
+      rgba(11, 13, 14, 0.86) 100%
+    );
+  opacity: 0.82;
+  pointer-events: none;
+  transition: opacity 0.18s ease;
 }
 
 .tidp-track:last-child { border-bottom: none; }
 
 .tidp-track:hover {
   border-left-color: var(--accent);
+  background: rgba(192, 132, 255, 0.02);
+  box-shadow: inset 0 0 22px rgba(255, 255, 255, 0.018);
+}
+
+.tidp-track:hover::before {
+  filter: blur(17px) saturate(1.48) brightness(0.98);
+  opacity: 0.23;
+  transform: scale(1.09);
+}
+
+.tidp-track:hover::after {
+  opacity: 0.76;
 }
 
 @keyframes tidp-track-in {
@@ -374,6 +501,7 @@
 
 .tidp-art-wrap {
   position: relative;
+  z-index: 1;
   width: 40px;
   height: 40px;
   flex-shrink: 0;
@@ -431,6 +559,8 @@
 }
 
 .tidp-info {
+  position: relative;
+  z-index: 1;
   flex: 1;
   min-width: 0;
 }
@@ -472,6 +602,8 @@
 }
 
 .tidp-duration {
+  position: relative;
+  z-index: 1;
   flex-shrink: 0;
   margin-left: auto;
   color: var(--text-5);
@@ -483,6 +615,8 @@
 /* Action buttons */
 
 .tidp-actions {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   gap: 3px;
@@ -741,6 +875,31 @@
 .tidp-player-stop:hover {
   color: var(--accent);
   text-shadow: 0 0 14px var(--accent-glow);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #tidl-popup,
+  #tidl-popup::after {
+    animation: none;
+  }
+
+  #tidl-panel {
+    --tidp-arrive-y: 0px;
+    --tidp-arrive-scale: 1;
+    opacity: 1;
+    transition:
+      width 0.01ms linear,
+      max-height 0.01ms linear,
+      box-shadow 0.01ms linear,
+      border-color 0.01ms linear,
+      background 0.01ms linear;
+  }
+
+  #tidl-panel::before,
+  .tidp-track::before,
+  .tidp-track::after {
+    transition: none;
+  }
 }
 
 /* Utility */

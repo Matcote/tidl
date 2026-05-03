@@ -218,7 +218,6 @@ function openSearchPanel(
     const desiredAnchor = btnTop + btnH;
     const minAnchor = window.scrollY + 8 + PANEL_HEIGHT;
     tidalPanel.style.top = `${Math.max(desiredAnchor, minAnchor)}px`;
-    tidalPanel.style.transform = 'translateY(-100%)';
     tidalPanel.classList.add('tidp-above');
   } else {
     const maxTop = window.scrollY + window.innerHeight - PANEL_HEIGHT - 8;
@@ -321,6 +320,30 @@ function revealBody(bodyEl?: HTMLElement, overlay?: HTMLElement): void {
   overlay.classList.add('tidp-hidden');
 }
 
+function toCssImageUrl(url: string | null): string | null {
+  if (!url) return null;
+  const trimmed = url.trim();
+  if (!/^https?:\/\//i.test(trimmed) && !trimmed.startsWith('data:image/')) return null;
+  const safeUrl = trimmed
+    .replace(/[\n\r\f]/g, '')
+    .replace(/\\/g, '%5C')
+    .replace(/"/g, '%22');
+  return `url("${safeUrl}")`;
+}
+
+function setPanelAura(artUrl: string | null): void {
+  if (!tidalPanel) return;
+  const cssUrl = toCssImageUrl(artUrl);
+  if (!cssUrl) {
+    tidalPanel.classList.remove('tidp-has-aura');
+    tidalPanel.style.removeProperty('--tidp-panel-art-bg');
+    return;
+  }
+
+  tidalPanel.style.setProperty('--tidp-panel-art-bg', cssUrl);
+  tidalPanel.classList.add('tidp-has-aura');
+}
+
 async function doSearch(query: string, bodyEl?: HTMLElement, overlay?: HTMLElement): Promise<void> {
   let searchResult: SearchResponse;
   try {
@@ -341,6 +364,7 @@ async function doSearch(query: string, bodyEl?: HTMLElement, overlay?: HTMLEleme
   errorEl.classList.add('tidp-hidden');
 
   if (searchResult.error) {
+    setPanelAura(null);
     errorEl.textContent = searchResult.error;
     errorEl.classList.remove('tidp-hidden');
     revealBody(bodyEl, overlay);
@@ -350,11 +374,13 @@ async function doSearch(query: string, bodyEl?: HTMLElement, overlay?: HTMLEleme
   const tracks = extractTracks(searchResult);
 
   if (!tracks.length) {
+    setPanelAura(null);
     empty.classList.remove('tidp-hidden');
     revealBody(bodyEl, overlay);
     return;
   }
 
+  setPanelAura(tracks[0]?.artUrl ?? null);
   renderTracks(tracks, results);
   results.classList.remove('tidp-hidden');
   revealBody(bodyEl, overlay);
@@ -378,6 +404,8 @@ function renderTracks(tracks: Track[], listEl: HTMLUListElement): void {
     const li = document.createElement('li');
     li.className = 'tidp-track';
     li.style.setProperty('--i', String(i));
+    const auraBg = toCssImageUrl(track.artUrl);
+    if (auraBg) li.style.setProperty('--tidp-row-art-bg', auraBg);
 
     const artWrap = document.createElement('div');
     artWrap.className = 'tidp-art-wrap';
