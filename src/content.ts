@@ -31,6 +31,99 @@ const PLUS_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" wi
 const CHECK_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>`;
 const PLAY_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="white" aria-hidden="true"><polygon points="6,3 20,12 6,21"/></svg>`;
 const PAUSE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="white" aria-hidden="true"><rect x="5" y="3" width="4" height="18"/><rect x="15" y="3" width="4" height="18"/></svg>`;
+const DEV_SERVER_URL = process.env.TIDL_DEV_SERVER_URL;
+
+type DevServerEvent = {
+  type?: 'content-css' | 'extension-reload';
+  version?: number;
+  paths?: string[];
+  useContentFallback?: boolean;
+};
+
+if (DEV_SERVER_URL) {
+  installDevReload(DEV_SERVER_URL);
+}
+
+function installDevReload(serverUrl: string): void {
+  void reloadDevContentCss(Date.now());
+
+  if (typeof EventSource === 'undefined') {
+    return;
+  }
+
+  let retryTimer: number | undefined;
+
+  const connect = () => {
+    const events = new EventSource(`${serverUrl}/events`);
+
+    events.onmessage = (event) => {
+      let msg: DevServerEvent;
+      try {
+        msg = JSON.parse(event.data) as DevServerEvent;
+      } catch {
+        return;
+      }
+
+      if (msg.type === 'content-css') {
+        void reloadDevContentCss(msg.version ?? Date.now());
+        return;
+      }
+
+      if (msg.type === 'extension-reload') {
+        reloadPageForDevBuild(Boolean(msg.useContentFallback));
+      }
+    };
+
+    events.onerror = () => {
+      events.close();
+      window.clearTimeout(retryTimer);
+      retryTimer = window.setTimeout(connect, 1000);
+    };
+  };
+
+  connect();
+}
+
+async function reloadDevContentCss(version: number): Promise<void> {
+  try {
+    const response = await fetch(chrome.runtime.getURL(`content.css?tidl-dev=${version}`), { cache: 'no-store' });
+    if (!response.ok) return;
+
+    const style = getOrCreateDevStyle();
+    style.textContent = rewriteDevCssUrls(await response.text());
+  } catch {
+    // The dev server and extension can briefly disagree during reloads.
+  }
+}
+
+function getOrCreateDevStyle(): HTMLStyleElement {
+  const existing = document.getElementById('tidl-dev-content-css');
+  if (existing instanceof HTMLStyleElement) return existing;
+
+  const style = document.createElement('style');
+  style.id = 'tidl-dev-content-css';
+  (document.head ?? document.documentElement).appendChild(style);
+  return style;
+}
+
+function rewriteDevCssUrls(css: string): string {
+  return css.replace(
+    /url\((['"]?)(?!data:|https?:|chrome-extension:|\/|#)([^'")]+)\1\)/g,
+    (_match, _quote: string, url: string) => `url("${chrome.runtime.getURL(url)}")`,
+  );
+}
+
+function reloadPageForDevBuild(useContentFallback: boolean): void {
+  if (useContentFallback) {
+    window.setTimeout(() => window.location.reload(), 700);
+    void chrome.runtime.sendMessage({ type: 'DEV_RELOAD_EXTENSION' }).catch(() => {
+      window.location.reload();
+    });
+    return;
+  }
+
+  window.setTimeout(() => window.location.reload(), 700);
+}
 
 // ─── Cleanup ──────────────────────────────────────────────────────────────────
 

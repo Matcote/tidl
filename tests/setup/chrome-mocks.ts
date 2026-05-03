@@ -53,6 +53,7 @@ const sessionStorageMock = makeStorage(sessionStore);
     onClicked: { addListener: vi.fn() },
   },
   identity: {
+    getRedirectURL: vi.fn((path = '') => `https://fake-extension-id.chromiumapp.org/${path}`),
     launchWebAuthFlow: vi.fn(),
   },
   windows: {

@@ -11,8 +11,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 TypeScript sources live in `src/`. Build to `dist/` before loading in Chrome:
 
 ```
-npm run build      # compile once
-npm run watch      # compile on file changes
+npm run dev        # watch, launch Chrome with dist/, hot-swap CSS, auto-reload JS changes
+npm run dev:chrome # same dev loop using the normal Chrome profile/extensions
+npm run build      # compile once for production/load-unpacked
 npm run typecheck  # type-check only (no output)
 ```
 
@@ -22,7 +23,7 @@ Load the extension from `dist/` (not the project root):
 2. Enable "Developer mode"
 3. Click "Load unpacked" → select the `dist/` directory
 
-After editing files, run `npm run build` then click the reload button on the extension card in `chrome://extensions`. Content script changes also require refreshing the target tab.
+For daily development, prefer `npm run dev`; it reloads the extension and target pages automatically. For a manual production-style check, run `npm run build` then click the reload button on the extension card in `chrome://extensions`. Content script changes also require refreshing the target tab in that manual flow.
 
 ## Architecture
 

@@ -8,7 +8,8 @@ export type ExtensionMessage =
   | { type: 'OPEN_RESULTS'; query: string }
   | { type: 'STORE_TOKENS'; data: OAuthTokenResponse }
   | { type: 'GET_FAVORITES'; forceRefresh?: boolean }
-  | { type: 'GET_CREDENTIALS' };
+  | { type: 'GET_CREDENTIALS' }
+  | { type: 'DEV_RELOAD_EXTENSION' };
 
 // Normalized domain objects
 export interface Track {

@@ -97,6 +97,14 @@ chrome.runtime.onMessage.addListener((msg: ExtensionMessage, _sender, sendRespon
     case 'STORE_TOKENS':
       storeTokens(msg.data).then(() => sendResponse({ ok: true }));
       return true;
+    case 'DEV_RELOAD_EXTENSION':
+      if (!process.env.TIDL_DEV_SERVER_URL) {
+        sendResponse({ error: 'Dev reload is only available from npm run dev.' });
+        return false;
+      }
+      sendResponse({ ok: true });
+      setTimeout(() => chrome.runtime.reload(), 20);
+      return false;
   }
 });
 

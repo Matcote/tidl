@@ -100,7 +100,7 @@ export function decodeTidalJwtPayload(accessToken: string): TidalJwtPayload | nu
 // ─── OAuth Connect ───────────────────────────────────────────────────────────
 
 connectBtn.addEventListener('click', async () => {
-  const redirectUri = `https://${chrome.runtime.id}.chromiumapp.org/`;
+  const redirectUri = getRedirectUri();
 
   let loginUrl: string;
   try {
@@ -115,13 +115,10 @@ connectBtn.addEventListener('click', async () => {
 
   let redirectUrl: string | undefined;
   try {
-    redirectUrl = await chrome.identity.launchWebAuthFlow({
-      url: loginUrl,
-      interactive: true,
-    });
+    redirectUrl = await launchTidalAuth(loginUrl, redirectUri);
   } catch (err) {
-    console.error('[tidl] launchWebAuthFlow error:', err);
-    showMessage(`Auth failed: ${err instanceof Error ? err.message : String(err)}`, true);
+    console.error('[tidl] auth flow error:', err);
+    showMessage(formatAuthLaunchError(err, redirectUri), true);
     return;
   }
 
@@ -183,6 +180,91 @@ disconnectBtn.addEventListener('click', async () => {
 
 // ─── UI Helpers ───────────────────────────────────────────────────────────────
 
+function getRedirectUri(): string {
+  return chrome.identity.getRedirectURL?.() ?? `https://${chrome.runtime.id}.chromiumapp.org/`;
+}
+
+async function launchTidalAuth(loginUrl: string, redirectUri: string): Promise<string | undefined> {
+  try {
+    return await chrome.identity.launchWebAuthFlow({
+      url: loginUrl,
+      interactive: true,
+    });
+  } catch (err) {
+    if (!isAuthorizationPageLoadError(err)) throw err;
+    console.warn('[tidl] launchWebAuthFlow failed, retrying in a normal Chrome popup:', err);
+    showMessage('Chrome auth window failed. Opening Tidal login in a normal Chrome popup...');
+    return launchTidalAuthPopup(loginUrl, redirectUri);
+  }
+}
+
+function isAuthorizationPageLoadError(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err);
+  return message.includes('Authorization page could not be loaded');
+}
+
+async function launchTidalAuthPopup(loginUrl: string, redirectUri: string): Promise<string | undefined> {
+  const authWindow = await chrome.windows.create({
+    url: loginUrl,
+    type: 'popup',
+    width: 520,
+    height: 720,
+  });
+  const tabId = authWindow.tabs?.[0]?.id;
+  const windowId = authWindow.id;
+
+  if (tabId === undefined) {
+    throw new Error('Could not open Tidal login popup.');
+  }
+
+  return new Promise((resolve, reject) => {
+    const timeout = window.setTimeout(() => {
+      finish(undefined, new Error('Tidal login timed out.'));
+    }, 5 * 60 * 1000);
+
+    const onUpdated = (updatedTabId: number, changeInfo: chrome.tabs.TabChangeInfo, tab: chrome.tabs.Tab) => {
+      if (updatedTabId !== tabId) return;
+
+      const url = changeInfo.url ?? tab.url;
+      if (url && isAuthRedirect(url, redirectUri)) {
+        finish(url);
+      }
+    };
+
+    const onRemoved = (removedTabId: number) => {
+      if (removedTabId === tabId) finish(undefined);
+    };
+
+    function finish(redirectUrl?: string, err?: Error): void {
+      window.clearTimeout(timeout);
+      chrome.tabs.onUpdated.removeListener(onUpdated);
+      chrome.tabs.onRemoved.removeListener(onRemoved);
+
+      if (redirectUrl && windowId !== undefined) {
+        chrome.windows.remove(windowId).catch(() => {});
+      }
+
+      if (err) {
+        reject(err);
+        return;
+      }
+      resolve(redirectUrl);
+    }
+
+    chrome.tabs.onUpdated.addListener(onUpdated);
+    chrome.tabs.onRemoved.addListener(onRemoved);
+  });
+}
+
+function isAuthRedirect(url: string, redirectUri: string): boolean {
+  return url.startsWith(redirectUri);
+}
+
+function formatAuthLaunchError(err: unknown, redirectUri: string): string {
+  const message = err instanceof Error ? err.message : String(err);
+  return `Auth failed: ${message}. Check that this redirect URI is registered in your Tidal app: ${redirectUri}`;
+}
+
 function showConnected(name: string): void {
   usernameEl.textContent = name;
   statusConnected.classList.remove('hidden');
@@ -194,7 +276,7 @@ function showMessage(text: string, isError = false): void {
   messageEl.textContent = text;
   messageEl.classList.remove('hidden', 'error');
   if (isError) messageEl.classList.add('error');
-  setTimeout(() => messageEl.classList.add('hidden'), 4000);
+  setTimeout(() => messageEl.classList.add('hidden'), isError ? 12000 : 4000);
 }
 
 init();

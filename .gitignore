@@ -4,4 +4,5 @@ secrets.json
 node_modules/
 dist/
 releases/
+.tidl-chrome-profile/
 *.zip
