@@ -1,6 +1,6 @@
 // tIDl — Options Page
 
-import { startLogin, completeLogin, logoutAuth, initAuth, credentialsProvider } from '../shared/auth';
+import { startLogin, completeLogin, logoutAuth, credentialsProvider } from '../shared/auth';
 
 interface TidalJwtPayload {
   firstName?: string;
@@ -28,7 +28,7 @@ async function init(): Promise<void> {
     selectionPopup?: boolean;
   };
   const { tidalUsername, selectionPopup = true } = stored;
-  if (await hasStoredCredentials()) showConnected(tidalUsername ?? 'Tidal User');
+  if (tidalUsername) showConnected(tidalUsername);
   selectionPopupToggle.checked = selectionPopup;
 }
 
@@ -246,16 +246,6 @@ async function launchTidalAuthPopup(loginUrl: string, redirectUri: string): Prom
 
 function isAuthRedirect(url: string, redirectUri: string): boolean {
   return url.startsWith(redirectUri);
-}
-
-async function hasStoredCredentials(): Promise<boolean> {
-  try {
-    await initAuth();
-    const creds = await credentialsProvider.getCredentials();
-    return Boolean(creds.token);
-  } catch {
-    return false;
-  }
 }
 
 function formatAuthLaunchError(err: unknown, redirectUri: string): string {

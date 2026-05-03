@@ -12,6 +12,7 @@ import type { StorageAdapter } from '@tidal-music/auth';
 import { CLIENT_ID, SCOPES } from './constants';
 
 const STORAGE_KEY = 'tidl-auth';
+const TRUETIME_WARNING = 'TrueTime is not yet synchronized';
 
 const chromeStorageAdapter: StorageAdapter = {
   async load(key: string): Promise<string | null> {
@@ -27,6 +28,7 @@ const chromeStorageAdapter: StorageAdapter = {
 };
 
 let initialized = false;
+let warningFilterInstalled = false;
 
 // Stable per-installation key so Tidal can identify this device.
 async function getClientUniqueKey(): Promise<string> {
@@ -39,6 +41,7 @@ async function getClientUniqueKey(): Promise<string> {
 
 export async function initAuth(): Promise<void> {
   if (initialized) return;
+  installTidalSdkWarningFilter();
   const clientUniqueKey = await getClientUniqueKey();
   await init({
     clientId: CLIENT_ID,
@@ -65,3 +68,14 @@ export function logoutAuth(): void {
 }
 
 export { credentialsProvider };
+
+function installTidalSdkWarningFilter(): void {
+  if (warningFilterInstalled) return;
+  warningFilterInstalled = true;
+
+  const originalWarn = console.warn.bind(console);
+  console.warn = (...args: unknown[]) => {
+    if (args.length === 1 && args[0] === TRUETIME_WARNING) return;
+    originalWarn(...args);
+  };
+}
