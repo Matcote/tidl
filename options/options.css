@@ -1,163 +1,221 @@
-:root {
-  --bg:         #0a0a0a;
-  --surface:    #0d0d0d;
-  --surface-2:  #161616;
-  --border:     #2a2a2a;
-  --border-hi:  #333;
-  --accent:     #00FFFF;
-  --text:       #ffffff;
-  --text-2:     #e8e8e8;
-  --text-3:     #999;
-  --text-4:     #888;
-  --text-5:     #777;
-  --text-6:     #666;
-  --green:      #22c55e;
-  --red:        #ff4d6a;
-  --amber:      #f59e0b;
-  --error:      #f87171;
-  --font:       'Chakra Petch', system-ui, sans-serif;
+@font-face {
+  font-family: 'Geist';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('../fonts/Geist-Variable.woff2') format('woff2');
 }
 
-* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #060707;
+  --surface: #0b0d0e;
+  --surface-2: #101416;
+  --surface-3: #151b1e;
+  --border: rgba(255, 255, 255, 0.11);
+  --border-hi: rgba(192, 132, 255, 0.58);
+  --accent: #c084ff;
+  --accent-soft: rgba(192, 132, 255, 0.14);
+  --accent-glow: rgba(192, 132, 255, 0.22);
+  --text: #f7fbfb;
+  --text-2: #dce5e5;
+  --text-3: #9ea9aa;
+  --text-4: #7f8a8c;
+  --text-5: #657073;
+  --text-6: #4d575a;
+  --green: #33d889;
+  --red: #ff4f7b;
+  --amber: #ffb84d;
+  --error: #ff7a90;
+  --font: 'Geist', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
 
 body {
-  font-family: 'Chakra Petch', system-ui, sans-serif;
-  background: #0a0a0a;
-  color: #e8e8e8;
-  min-height: 100vh;
   display: flex;
+  min-height: 100vh;
   justify-content: center;
   padding: 48px 16px;
+  background: var(--bg);
+  color: var(--text-2);
+  font-family: var(--font);
 }
 
 .container {
+  display: flex;
   width: 100%;
   max-width: 480px;
-  display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 18px;
 }
 
 header h1 {
-  font-size: 26px;
-  font-weight: 500;
-  letter-spacing: 0.02em;
-  color: #fff;
+  color: var(--text);
+  font-size: 28px;
+  font-weight: 720;
+  line-height: 1.05;
+  text-shadow: 0 0 14px rgba(192, 132, 255, 0.16);
 }
 
-header h1 span { color: #00FFFF; }
+header h1 span {
+  color: var(--accent);
+}
 
 .subtitle {
-  color: #888;
   margin-top: 8px;
-  font-size: 12px;
+  color: var(--text-4);
+  font-size: 13px;
   line-height: 1.5;
 }
 
 .card {
-  background: #0d0d0d;
-  border-top: 2px solid #00FFFF;
-  border-left: 1px solid #2a2a2a;
-  border-right: 1px solid #2a2a2a;
-  border-bottom: 1px solid #2a2a2a;
-  border-radius: 0;
-  padding: 24px;
   display: flex;
   flex-direction: column;
   gap: 16px;
+  padding: 22px;
+  border: 1px solid var(--border);
+  border-top-color: rgba(192, 132, 255, 0.52);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 18px 38px rgba(0, 0, 0, 0.34), 0 0 16px rgba(192, 132, 255, 0.05);
 }
 
 .card h2 {
+  color: var(--text-3);
   font-size: 11px;
-  font-weight: 500;
-  color: #999;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
+  font-weight: 650;
 }
 
 .card p {
+  color: var(--text-3);
   font-size: 12px;
-  color: #999;
   line-height: 1.6;
 }
 
-.card p a { color: #00FFFF; text-decoration: none; }
-.card p a:hover { text-decoration: underline; }
+.card p a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.card p a:hover {
+  text-decoration: underline;
+  text-shadow: 0 0 10px rgba(192, 132, 255, 0.14);
+  text-underline-offset: 3px;
+}
 
 button {
+  min-height: 36px;
   padding: 10px 18px;
-  border-radius: 0;
+  border: none;
+  border-radius: 8px;
   font-family: inherit;
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 650;
   cursor: pointer;
-  border: none;
-  transition: opacity 0.15s, background 0.15s;
-  letter-spacing: 0.04em;
+  transition: opacity 0.15s ease, background 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
 }
 
-button:hover { opacity: 0.85; }
+button:hover {
+  transform: translateY(-1px);
+}
 
-button.primary, #connect-btn {
-  background: #00FFFF;
-  color: #000;
+button:focus-visible {
+  outline: 2px solid rgba(192, 132, 255, 0.72);
+  outline-offset: 2px;
+}
+
+button.primary,
+#connect-btn {
   width: 100%;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+  background: var(--accent);
+  color: #190014;
+  box-shadow: 0 0 16px rgba(192, 132, 255, 0.16);
 }
 
-button.secondary, #disconnect {
-  background: transparent;
-  border: 1px solid #333;
-  color: #888;
+button.primary:hover,
+#connect-btn:hover {
+  box-shadow: 0 0 22px rgba(192, 132, 255, 0.24);
+}
+
+button.secondary,
+#disconnect {
   width: auto;
-  padding: 6px 14px;
+  min-height: 30px;
+  padding: 7px 14px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--text-3);
   font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
 }
 
-button.secondary:hover, #disconnect:hover {
-  border-color: #555;
-  color: #ccc;
-  opacity: 1;
+button.secondary:hover,
+#disconnect:hover {
+  border-color: rgba(192, 132, 255, 0.34);
+  background: rgba(192, 132, 255, 0.08);
+  color: var(--text);
+  box-shadow: 0 0 12px rgba(192, 132, 255, 0.08);
 }
 
 .status {
   display: flex;
   align-items: center;
   gap: 10px;
+  color: var(--text-2);
   font-size: 12px;
+  line-height: 1.4;
+}
+
+.status strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .dot {
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   flex-shrink: 0;
 }
 
-.dot.connected { background: #22c55e; box-shadow: 0 0 6px rgba(34, 197, 94, 0.5); }
-.dot.disconnected { background: #333; }
+.dot.connected {
+  background: var(--green);
+  box-shadow: 0 0 8px rgba(51, 216, 137, 0.36);
+}
+
+.dot.disconnected {
+  background: rgba(255, 255, 255, 0.2);
+}
 
 .message {
+  padding: 11px 14px;
+  border: 1px solid rgba(51, 216, 137, 0.24);
+  border-left: 2px solid var(--green);
+  border-radius: 8px;
+  background: rgba(51, 216, 137, 0.08);
+  color: var(--green);
   font-size: 11px;
-  padding: 10px 14px;
-  border-radius: 0;
-  background: transparent;
-  color: #22c55e;
-  border-left: 2px solid #22c55e;
-  letter-spacing: 0.03em;
+  line-height: 1.45;
+  box-shadow: 0 0 12px rgba(51, 216, 137, 0.08);
 }
 
 .message.error {
-  color: #f87171;
-  border-left-color: #f87171;
+  border-color: rgba(255, 122, 144, 0.24);
+  border-left-color: var(--error);
+  background: rgba(255, 122, 144, 0.08);
+  color: var(--error);
+  box-shadow: 0 0 12px rgba(255, 122, 144, 0.08);
 }
 
 .hidden { display: none !important; }
 
-/* ─── Toggle row ─────────────────────────────────── */
+/* Toggle row */
 
 .toggle-row {
   display: flex;
@@ -169,64 +227,72 @@ button.secondary:hover, #disconnect:hover {
 
 .toggle-info {
   display: flex;
+  min-width: 0;
   flex-direction: column;
   gap: 5px;
 }
 
 .toggle-label {
+  color: var(--text-2);
   font-size: 13px;
-  font-weight: 500;
-  color: #e8e8e8;
+  font-weight: 620;
 }
 
 .toggle-desc {
+  color: var(--text-4);
   font-size: 11px;
-  color: #888;
   line-height: 1.5;
 }
 
 .toggle-switch {
   position: relative;
-  width: 40px;
-  height: 22px;
+  width: 42px;
+  height: 24px;
   flex-shrink: 0;
 }
 
 .toggle-switch input {
-  opacity: 0;
+  position: absolute;
   width: 0;
   height: 0;
-  position: absolute;
+  opacity: 0;
 }
 
 .slider {
   position: absolute;
   inset: 0;
-  background: #222;
-  border-radius: 22px;
-  transition: background 0.2s;
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.08);
   cursor: pointer;
-  border: 1px solid #333;
+  transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .slider::before {
-  content: '';
   position: absolute;
-  width: 14px;
-  height: 14px;
-  left: 3px;
   top: 3px;
-  background: #666;
+  left: 3px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
-  transition: transform 0.2s, background 0.2s;
+  background: var(--text-5);
+  content: '';
+  transition: transform 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
 }
 
 .toggle-switch input:checked + .slider {
-  background: rgba(0, 255, 255, 0.15);
-  border-color: #00FFFF;
+  border-color: rgba(192, 132, 255, 0.62);
+  background: rgba(192, 132, 255, 0.14);
+  box-shadow: 0 0 12px rgba(192, 132, 255, 0.1);
 }
 
 .toggle-switch input:checked + .slider::before {
   transform: translateX(18px);
-  background: #00FFFF;
+  background: var(--accent);
+  box-shadow: 0 0 8px rgba(192, 132, 255, 0.28);
+}
+
+.toggle-switch input:focus-visible + .slider {
+  outline: 2px solid rgba(192, 132, 255, 0.72);
+  outline-offset: 3px;
 }

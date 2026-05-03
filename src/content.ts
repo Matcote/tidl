@@ -125,6 +125,7 @@ document.addEventListener('mouseup', (e) => {
 
     tidalPopupBtn = document.createElement('button');
     tidalPopupBtn.id = 'tidl-popup';
+    tidalPopupBtn.title = 'Search Tidal';
     tidalPopupBtn.innerHTML = `
       <svg width="20" height="13" viewBox="0 0 512 341.337" fill="white" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision" fill-rule="evenodd" clip-rule="evenodd"><path fill-rule="nonzero" d="M341.331 85.325l-85.308 85.332 85.32 85.337-85.325 85.343-85.349-85.343 85.343-85.337-85.343-85.343L256.018.006l85.319 85.308L426.675 0 512 85.325l-85.325 85.344-85.344-85.344zm-170.656 0l-85.343 85.344L0 85.325 85.332 0l85.343 85.325z"/></svg>
       Search Tidal
@@ -230,7 +231,12 @@ function openSearchPanel(
         <span class="tidp-logo"><svg xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision" text-rendering="geometricPrecision" image-rendering="optimizeQuality" fill-rule="evenodd" clip-rule="evenodd" viewBox="0 0 512 341.337"><path fill="#fff" fill-rule="nonzero" d="M341.331 85.325l-85.308 85.332 85.32 85.337-85.325 85.343-85.349-85.343 85.343-85.337-85.343-85.343L256.018.006l85.319 85.308L426.675 0 512 85.325l-85.325 85.344-85.344-85.344zm-170.656 0l-85.343 85.344L0 85.325 85.332 0l85.343 85.325z"/></svg></span>
         <span class="tidp-query-arrow">→</span>
         <input type="text" class="tidp-query" value="${escapeHtml(query)}" spellcheck="false" autocomplete="off" />
-        <button class="tidp-close" aria-label="Close">×</button>
+        <button class="tidp-close" aria-label="Close" title="Close">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="15" height="15" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
       </div>
       <div class="tidp-body">
         <div class="tidp-loading">
@@ -375,6 +381,7 @@ function renderTracks(tracks: Track[], listEl: HTMLUListElement): void {
 
     const artWrap = document.createElement('div');
     artWrap.className = 'tidp-art-wrap';
+    artWrap.title = 'Play or pause preview';
 
     const img = document.createElement('img');
     img.className = 'tidp-art';
@@ -419,6 +426,7 @@ function renderTracks(tracks: Track[], listEl: HTMLUListElement): void {
     favBtn.dataset['trackId'] = track.id;
     favBtn.innerHTML = HEART_SVG;
     favBtn.setAttribute('aria-label', 'Add to favorites');
+    favBtn.title = 'Add to favorites';
     favBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       toggleFavoriteInline(track.id, favBtn);
@@ -428,6 +436,7 @@ function renderTracks(tracks: Track[], listEl: HTMLUListElement): void {
     plBtn.className = 'tidp-btn-pl';
     plBtn.innerHTML = PLUS_SVG;
     plBtn.setAttribute('aria-label', 'Add to playlist');
+    plBtn.title = 'Add to playlist';
     plBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       togglePlaylistPickerInline(e, track.id, plBtn);
@@ -476,6 +485,7 @@ function setFavoriteButtonStateInline(
   btn.classList.toggle('tidp-no-anim', favorited && options.animate === false);
   btn.setAttribute('aria-label', favorited ? 'Remove from favorites' : 'Add to favorites');
   btn.setAttribute('aria-pressed', String(favorited));
+  btn.title = favorited ? 'Remove from favorites' : 'Add to favorites';
 
   const heartPath = btn.querySelector<SVGPathElement>('svg path');
   if (heartPath) {
@@ -582,9 +592,11 @@ async function openPlaylistPickerInline(trackId: string, btn: HTMLButtonElement)
         panelAddedMap.get(trackId)!.add(playlist.id);
         btn.innerHTML = CHECK_SVG;
         btn.classList.add('added');
+        btn.title = 'Added to playlist';
         setTimeout(() => {
           btn.innerHTML = PLUS_SVG;
           btn.classList.remove('added');
+          btn.title = 'Add to playlist';
           btn.disabled = false;
         }, 1500);
       }

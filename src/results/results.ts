@@ -83,6 +83,7 @@ function renderTracks(tracks: Track[]): void {
 
     const artWrap = document.createElement('div');
     artWrap.className = 'track-art-wrap';
+    artWrap.title = 'Play or pause preview';
 
     const img = document.createElement('img');
     img.className = 'track-art';
@@ -127,12 +128,14 @@ function renderTracks(tracks: Track[]): void {
     favBtn.dataset['trackId'] = track.id;
     favBtn.innerHTML = HEART_SVG;
     favBtn.setAttribute('aria-label', 'Add to favorites');
+    favBtn.title = 'Add to favorites';
     favBtn.addEventListener('click', () => toggleFavorite(track.id, favBtn));
 
     const plBtn = document.createElement('button');
     plBtn.className = 'btn-playlist';
     plBtn.innerHTML = PLUS_SVG;
     plBtn.setAttribute('aria-label', 'Add to playlist');
+    plBtn.title = 'Add to playlist';
     plBtn.addEventListener('click', (e) => togglePlaylistPicker(e, track.id, plBtn));
 
     artWrap.addEventListener('click', () => {
@@ -181,6 +184,7 @@ function setFavoriteButtonState(
   btn.classList.toggle('no-anim', favorited && options.animate === false);
   btn.setAttribute('aria-label', favorited ? 'Remove from favorites' : 'Add to favorites');
   btn.setAttribute('aria-pressed', String(favorited));
+  btn.title = favorited ? 'Remove from favorites' : 'Add to favorites';
 
   const heartPath = btn.querySelector<SVGPathElement>('svg path');
   if (heartPath) {
@@ -285,9 +289,11 @@ async function openPlaylistPicker(trackId: string, btn: HTMLButtonElement): Prom
           addedMap.get(trackId)!.add(playlist.id);
           btn.innerHTML = CHECK_SVG;
           btn.classList.add('added');
+          btn.title = 'Added to playlist';
           setTimeout(() => {
             btn.innerHTML = PLUS_SVG;
             btn.classList.remove('added');
+            btn.title = 'Add to playlist';
             btn.disabled = false;
           }, 1500);
         }

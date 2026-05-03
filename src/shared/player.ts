@@ -98,6 +98,7 @@ export function createPlayer(
     const stopBtn = document.createElement('button');
     stopBtn.className = `${prefix}-player-stop`;
     stopBtn.setAttribute('aria-label', 'Stop');
+    stopBtn.title = 'Stop preview';
     stopBtn.textContent = '×';
     stopBtn.addEventListener('click', (e) => {
       e.stopPropagation();
