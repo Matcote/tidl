@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "tIDl",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Highlight text, search Tidal, add tracks to your favorites or playlists.",
   "permissions": ["contextMenus", "storage", "identity", "tabs"],
   "host_permissions": [
