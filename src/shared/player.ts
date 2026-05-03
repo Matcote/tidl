@@ -181,14 +181,6 @@ export function createPlayer(
     const ctx = detail.playbackContext;
     duration = ctx.actualDuration;
     if (totalEl) totalEl.textContent = formatTime(duration);
-
-    // Debug: why is playback preview-only?
-    console.log('[tIDl] media-product-transition playbackContext:', JSON.stringify({
-      actualAssetPresentation: ctx.actualAssetPresentation,
-      assetPresentation: ctx.assetPresentation,
-      actualDuration: ctx.actualDuration,
-      previewReason: ctx.previewReason,
-    }));
   }
 
   function onEnded(): void {
@@ -220,16 +212,6 @@ export function createPlayer(
     // Verify we have a valid token before proceeding
     const creds = await credentialsProvider.getCredentials();
     if (!creds.token) return;
-
-    // Debug: inspect credentials being sent to the player SDK
-    console.log('[tIDl] credentials:', JSON.stringify({
-      clientId: creds.clientId,
-      userId: creds.userId,
-      clientUniqueKey: creds.clientUniqueKey,
-      grantedScopes: creds.grantedScopes,
-      requestedScopes: creds.requestedScopes,
-      tokenPrefix: creds.token?.substring(0, 20) + '...',
-    }));
 
     // Update art indicators
     if (currentArtEl) currentArtEl.classList.remove(`${prefix}-art-playing`);

@@ -3,6 +3,7 @@ const fs = require('fs');
 
 const watch = process.argv.includes('--watch');
 const devServerUrl = process.env.TIDL_DEV_SERVER_URL || '';
+const isDevBuild = watch || Boolean(devServerUrl);
 
 function loadEnv() {
   const env = {};
@@ -26,10 +27,9 @@ const sharedConfig = {
   outdir: '.',
   platform: 'browser',
   target: ['chrome120'],
-  sourcemap: true,
+  sourcemap: isDevBuild,
   define: {
     'process.env.TIDAL_CLIENT_ID':     JSON.stringify(env.TIDAL_CLIENT_ID || ''),
-    'process.env.TIDAL_CLIENT_SECRET': JSON.stringify(env.TIDAL_CLIENT_SECRET || ''),
     'process.env.TIDL_DEV_SERVER_URL': JSON.stringify(devServerUrl),
   },
 };
@@ -103,6 +103,7 @@ const stripExportsPlugin = {
 };
 
 async function build() {
+  fs.rmSync('dist', { recursive: true, force: true });
   copyStaticAssets();
 
   const iifeCtx = await esbuild.context({

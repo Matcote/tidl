@@ -6,9 +6,7 @@ export type ExtensionMessage =
   | { type: 'REMOVE_FAVORITE'; trackId: string }
   | { type: 'ADD_TO_PLAYLIST'; trackId: string; playlistId: string }
   | { type: 'OPEN_RESULTS'; query: string }
-  | { type: 'STORE_TOKENS'; data: OAuthTokenResponse }
   | { type: 'GET_FAVORITES'; forceRefresh?: boolean }
-  | { type: 'GET_CREDENTIALS' }
   | { type: 'DEV_RELOAD_EXTENSION' };
 
 // Normalized domain objects
@@ -33,14 +31,6 @@ export interface SearchResponse { error?: string; data?: TidalJsonApiResource[];
 export interface PlaylistsResponse { error?: string; data?: TidalJsonApiResource[] }
 export interface MutationResponse { ok?: true; error?: string; status?: number }
 export interface FavoritesResponse { error?: string; trackIds?: string[] }
-export interface CredentialsResponse { token?: string | undefined; clientId?: string | undefined; userId?: string | undefined; error?: string | undefined }
-
-// OAuth
-export interface OAuthTokenResponse {
-  access_token: string; refresh_token?: string; expires_in: number;
-  user_id?: string; token_type: string;
-}
-
 // Chrome storage
 export interface LocalStorage {
   accessToken?: string; refreshToken?: string; expiresAt?: number;

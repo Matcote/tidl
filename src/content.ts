@@ -3,7 +3,7 @@
 // then morphs it into an inline search panel.
 
 import { extractTracks } from './shared/tracks';
-import { escapeHtml, openTidalLink } from './shared/utils';
+import { openTidalLink } from './shared/utils';
 import { createPlayer } from './shared/player';
 import type { Player } from './shared/player';
 import type { Track, Playlist, PlaylistsResponse, SearchResponse, FavoritesResponse, MutationResponse } from './shared/types';
@@ -322,7 +322,7 @@ function openSearchPanel(
       <div class="tidp-header">
         <span class="tidp-logo"><svg xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision" text-rendering="geometricPrecision" image-rendering="optimizeQuality" fill-rule="evenodd" clip-rule="evenodd" viewBox="0 0 512 341.337"><path fill="#fff" fill-rule="nonzero" d="M341.331 85.325l-85.308 85.332 85.32 85.337-85.325 85.343-85.349-85.343 85.343-85.337-85.343-85.343L256.018.006l85.319 85.308L426.675 0 512 85.325l-85.325 85.344-85.344-85.344zm-170.656 0l-85.343 85.344L0 85.325 85.332 0l85.343 85.325z"/></svg></span>
         <span class="tidp-query-arrow">→</span>
-        <input type="text" class="tidp-query" value="${escapeHtml(query)}" spellcheck="false" autocomplete="off" />
+        <input type="text" class="tidp-query" spellcheck="false" autocomplete="off" />
         <button class="tidp-close" aria-label="Close" title="Close">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="15" height="15" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
             <line x1="18" y1="6" x2="6" y2="18"/>
@@ -365,6 +365,7 @@ function openSearchPanel(
   // Debounced re-search when the user edits the query
   let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   const queryInput = tidalPanel.querySelector<HTMLInputElement>('.tidp-query')!;
+  queryInput.value = query;
   queryInput.addEventListener('input', () => {
     if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
     searchDebounceTimer = setTimeout(() => {
@@ -490,7 +491,7 @@ async function doSearch(query: string, bodyEl?: HTMLElement, overlay?: HTMLEleme
 
 // ─── Render ───────────────────────────────────────────────────────────────────
 
-function renderTracks(tracks: Track[], listEl: HTMLUListElement): void {
+export function renderTracks(tracks: Track[], listEl: HTMLUListElement): void {
   listEl.innerHTML = '';
 
   for (const [i, track] of tracks.entries()) {
@@ -507,9 +508,10 @@ function renderTracks(tracks: Track[], listEl: HTMLUListElement): void {
     const img = document.createElement('img');
     img.className = 'tidp-art';
     img.alt = '';
-    img.src =
-      track.artUrl ??
-      'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><rect width="40" height="40" fill="%231a1a1a"/></svg>';
+    img.src = toImageSrc(
+      track.artUrl,
+      'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><rect width="40" height="40" fill="%231a1a1a"/></svg>',
+    );
 
     const overlay = document.createElement('div');
     overlay.className = 'tidp-art-overlay';
@@ -521,19 +523,15 @@ function renderTracks(tracks: Track[], listEl: HTMLUListElement): void {
     const info = document.createElement('div');
     info.className = 'tidp-info';
 
-    const artistHtml = track.artists.length
-      ? track.artists
-          .map(
-            a =>
-              `<a class="tidp-link" href="#" data-app-url="tidal://artist/${a.id}" data-web-url="https://tidal.com/artist/${a.id}">${escapeHtml(a.name)}</a>`,
-          )
-          .join(', ')
-      : 'Unknown Artist';
+    const title = document.createElement('div');
+    title.className = 'tidp-title';
+    appendTidalLink(title, 'tidp-link', 'track', track.id, track.title);
 
-    info.innerHTML = `
-      <div class="tidp-title"><a class="tidp-link" href="#" data-app-url="tidal://track/${track.id}" data-web-url="https://tidal.com/track/${track.id}">${escapeHtml(track.title)}</a></div>
-      <div class="tidp-artist">${artistHtml}</div>
-    `;
+    const artists = document.createElement('div');
+    artists.className = 'tidp-artist';
+    appendArtistLinks(artists, track.artists, 'tidp-link');
+
+    info.append(title, artists);
 
     const duration = document.createElement('span');
     duration.className = 'tidp-duration';
@@ -693,7 +691,10 @@ async function openPlaylistPickerInline(trackId: string, btn: HTMLButtonElement)
     const li = document.createElement('li');
     if (alreadyIn) {
       li.classList.add('tidp-pl-added');
-      li.innerHTML = `<span class="tidp-pl-check">✓</span>${escapeHtml(playlist.name)}`;
+      const check = document.createElement('span');
+      check.className = 'tidp-pl-check';
+      check.textContent = '✓';
+      li.append(check, document.createTextNode(playlist.name));
     } else {
       li.textContent = playlist.name;
     }
@@ -750,4 +751,40 @@ function getPlaylistName(attributes: Record<string, unknown> | undefined): strin
   return (attributes?.['name'] as string | undefined)
     ?? (attributes?.['title'] as string | undefined)
     ?? 'Untitled Playlist';
+}
+
+function appendArtistLinks(container: HTMLElement, artists: Track['artists'], className: string): void {
+  if (!artists.length) {
+    container.textContent = 'Unknown Artist';
+    return;
+  }
+
+  artists.forEach((artist, index) => {
+    if (index > 0) container.append(document.createTextNode(', '));
+    appendTidalLink(container, className, 'artist', artist.id, artist.name);
+  });
+}
+
+function appendTidalLink(
+  container: HTMLElement,
+  className: string,
+  kind: 'track' | 'artist',
+  id: string,
+  text: string,
+): void {
+  const encodedId = encodeURIComponent(id);
+  const link = document.createElement('a');
+  link.className = className;
+  link.href = '#';
+  link.dataset['appUrl'] = `tidal://${kind}/${encodedId}`;
+  link.dataset['webUrl'] = `https://tidal.com/${kind}/${encodedId}`;
+  link.textContent = text;
+  container.appendChild(link);
+}
+
+function toImageSrc(url: string | null, fallback: string): string {
+  if (!url) return fallback;
+  const trimmed = url.trim();
+  if (/^https?:\/\//i.test(trimmed) || trimmed.startsWith('data:image/')) return trimmed;
+  return fallback;
 }

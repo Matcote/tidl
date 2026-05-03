@@ -6,3 +6,7 @@ dist/
 releases/
 .tidl-chrome-profile/
 *.zip
+/background.js
+/content.js
+/options/options.js
+/results/results.js

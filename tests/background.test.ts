@@ -31,24 +31,39 @@ beforeEach(() => {
   mockGetCredentials.mockImplementation(() => Promise.resolve({ ...defaultCreds }));
 });
 
-describe('storeTokens', () => {
-  it('writes userId when user_id present', async () => {
-    await bg.storeTokens({
-      access_token: 'tok',
-      expires_in: 3600,
-      token_type: 'Bearer',
-      user_id: 'u999',
+describe('validateExtensionMessage', () => {
+  it('trims valid search queries', () => {
+    expect(bg.validateExtensionMessage({ type: 'SEARCH', query: '  aphex twin  ' })).toEqual({
+      ok: true,
+      message: { type: 'SEARCH', query: 'aphex twin' },
     });
-    expect(getLocalStore()['userId']).toBe('u999');
   });
 
-  it('does not write userId when user_id absent', async () => {
-    await bg.storeTokens({
-      access_token: 'tok',
-      expires_in: 3600,
-      token_type: 'Bearer',
+  it('rejects oversized search queries', () => {
+    const result = bg.validateExtensionMessage({ type: 'SEARCH', query: 'x'.repeat(513) });
+    expect(result).toEqual({ ok: false, error: 'Invalid query' });
+  });
+
+  it('rejects malformed track ids', () => {
+    const result = bg.validateExtensionMessage({ type: 'ADD_FAVORITE', trackId: '../secret' });
+    expect(result).toEqual({ ok: false, error: 'Invalid track id' });
+  });
+
+  it('rejects malformed playlist ids', () => {
+    const result = bg.validateExtensionMessage({
+      type: 'ADD_TO_PLAYLIST',
+      trackId: 'track-1',
+      playlistId: '<script>',
     });
-    expect('userId' in getLocalStore()).toBe(false);
+    expect(result).toEqual({ ok: false, error: 'Invalid playlist id' });
+  });
+
+  it('rejects messages from another extension id', () => {
+    const result = bg.validateExtensionMessage(
+      { type: 'GET_FAVORITES' },
+      { id: 'other-extension' } as chrome.runtime.MessageSender,
+    );
+    expect(result).toEqual({ ok: false, error: 'Invalid message sender' });
   });
 });
 

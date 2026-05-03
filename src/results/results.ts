@@ -1,7 +1,7 @@
 // tIDl — Results Page
 
 import { extractTracks } from '../shared/tracks';
-import { escapeHtml, openTidalLink } from '../shared/utils';
+import { openTidalLink } from '../shared/utils';
 import { createPlayer } from '../shared/player';
 import type { Player } from '../shared/player';
 import type { Track, Playlist, PlaylistsResponse, SearchResponse, FavoritesResponse, MutationResponse } from '../shared/types';
@@ -73,7 +73,7 @@ async function init(): Promise<void> {
 
 // ─── Render ───────────────────────────────────────────────────────────────────
 
-function renderTracks(tracks: Track[]): void {
+export function renderTracks(tracks: Track[]): void {
   resultsList.innerHTML = '';
 
   for (const [i, track] of tracks.entries()) {
@@ -88,9 +88,10 @@ function renderTracks(tracks: Track[]): void {
     const img = document.createElement('img');
     img.className = 'track-art';
     img.alt = '';
-    img.src =
-      track.artUrl ??
-      'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 44 44"><rect width="44" height="44" fill="%231a1a1a"/></svg>';
+    img.src = toImageSrc(
+      track.artUrl,
+      'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 44 44"><rect width="44" height="44" fill="%231a1a1a"/></svg>',
+    );
 
     const overlay = document.createElement('div');
     overlay.className = 'track-art-overlay';
@@ -102,19 +103,15 @@ function renderTracks(tracks: Track[]): void {
     const info = document.createElement('div');
     info.className = 'track-info';
 
-    const artistHtml = track.artists.length
-      ? track.artists
-          .map(
-            a =>
-              `<a class="track-link" href="#" data-app-url="tidal://artist/${a.id}" data-web-url="https://tidal.com/artist/${a.id}">${escapeHtml(a.name)}</a>`,
-          )
-          .join(', ')
-      : 'Unknown Artist';
+    const title = document.createElement('div');
+    title.className = 'track-title';
+    appendTidalLink(title, 'track-link', 'track', track.id, track.title);
 
-    info.innerHTML = `
-      <div class="track-title"><a class="track-link" href="#" data-app-url="tidal://track/${track.id}" data-web-url="https://tidal.com/track/${track.id}">${escapeHtml(track.title)}</a></div>
-      <div class="track-artist">${artistHtml}</div>
-    `;
+    const artists = document.createElement('div');
+    artists.className = 'track-artist';
+    appendArtistLinks(artists, track.artists, 'track-link');
+
+    info.append(title, artists);
 
     const duration = document.createElement('span');
     duration.className = 'track-duration';
@@ -266,7 +263,10 @@ async function openPlaylistPicker(trackId: string, btn: HTMLButtonElement): Prom
     const li = document.createElement('li');
     if (alreadyIn) {
       li.classList.add('pl-added');
-      li.innerHTML = `<span class="pl-check">✓</span>${escapeHtml(playlist.name)}`;
+      const check = document.createElement('span');
+      check.className = 'pl-check';
+      check.textContent = '✓';
+      li.append(check, document.createTextNode(playlist.name));
     } else {
       li.textContent = playlist.name;
     }
@@ -328,6 +328,42 @@ function getPlaylistName(attributes: Record<string, unknown> | undefined): strin
   return (attributes?.['name'] as string | undefined)
     ?? (attributes?.['title'] as string | undefined)
     ?? 'Untitled Playlist';
+}
+
+function appendArtistLinks(container: HTMLElement, artists: Track['artists'], className: string): void {
+  if (!artists.length) {
+    container.textContent = 'Unknown Artist';
+    return;
+  }
+
+  artists.forEach((artist, index) => {
+    if (index > 0) container.append(document.createTextNode(', '));
+    appendTidalLink(container, className, 'artist', artist.id, artist.name);
+  });
+}
+
+function appendTidalLink(
+  container: HTMLElement,
+  className: string,
+  kind: 'track' | 'artist',
+  id: string,
+  text: string,
+): void {
+  const encodedId = encodeURIComponent(id);
+  const link = document.createElement('a');
+  link.className = className;
+  link.href = '#';
+  link.dataset['appUrl'] = `tidal://${kind}/${encodedId}`;
+  link.dataset['webUrl'] = `https://tidal.com/${kind}/${encodedId}`;
+  link.textContent = text;
+  container.appendChild(link);
+}
+
+function toImageSrc(url: string | null, fallback: string): string {
+  if (!url) return fallback;
+  const trimmed = url.trim();
+  if (/^https?:\/\//i.test(trimmed) || trimmed.startsWith('data:image/')) return trimmed;
+  return fallback;
 }
 
 // Close picker when clicking outside

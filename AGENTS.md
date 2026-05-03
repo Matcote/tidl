@@ -49,10 +49,10 @@ Handles all privileged operations:
 ### 3. Options Page + Results Popup (`src/options/options.ts`, `src/results/results.ts`)
 - `options/`: OAuth login UI, username display, toggle for selection popup behavior — stores settings in `chrome.storage.local`
 - `results/`: Standalone 500×620px search window launched by context menu (vs. the inline panel launched by text selection)
-- Shared utilities in `src/shared/`: `types.ts` (interfaces), `constants.ts` (API URLs, credentials), `tracks.ts` (extractTracks, formatDuration), `utils.ts` (escapeHtml, openTidalLink)
+- Shared utilities in `src/shared/`: `types.ts` (interfaces), `constants.ts` (API URLs and public client ID), `tracks.ts` (extractTracks, formatDuration), `utils.ts` (escapeHtml, openTidalLink)
 
 ### Message Protocol
-Content script → background: `{ type: "SEARCH" | "GET_PLAYLISTS" | "ADD_FAVORITE" | "ADD_TO_PLAYLIST" | "OPEN_RESULTS" | "STORE_TOKENS", ... }` (typed as `ExtensionMessage` discriminated union in `src/shared/types.ts`)
+Content script → background: `{ type: "SEARCH" | "GET_PLAYLISTS" | "ADD_FAVORITE" | "REMOVE_FAVORITE" | "ADD_TO_PLAYLIST" | "GET_FAVORITES" | "OPEN_RESULTS", ... }` (typed as `ExtensionMessage` discriminated union in `src/shared/types.ts`)
 Background stores transient search queries in `chrome.storage.session` key `tidlQuery` for the results popup to pick up.
 
 ### Chrome Storage Keys

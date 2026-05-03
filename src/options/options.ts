@@ -1,7 +1,6 @@
 // tIDl — Options Page
 
-import { startLogin, completeLogin, logoutAuth } from '../shared/auth';
-import { CLIENT_ID } from '../shared/constants';
+import { startLogin, completeLogin, logoutAuth, initAuth, credentialsProvider } from '../shared/auth';
 
 interface TidalJwtPayload {
   firstName?: string;
@@ -24,13 +23,12 @@ const selectionPopupToggle = document.getElementById('selection-popup-toggle') a
 // ─── Init ─────────────────────────────────────────────────────────────────────
 
 async function init(): Promise<void> {
-  const stored = await chrome.storage.local.get(['accessToken', 'tidalUsername', 'selectionPopup']) as {
-    accessToken?: string;
+  const stored = await chrome.storage.local.get(['tidalUsername', 'selectionPopup']) as {
     tidalUsername?: string;
     selectionPopup?: boolean;
   };
-  const { accessToken, tidalUsername, selectionPopup = true } = stored;
-  if (accessToken) showConnected(tidalUsername ?? 'Tidal User');
+  const { tidalUsername, selectionPopup = true } = stored;
+  if (await hasStoredCredentials()) showConnected(tidalUsername ?? 'Tidal User');
   selectionPopupToggle.checked = selectionPopup;
 }
 
@@ -58,7 +56,6 @@ export async function fetchUserProfile(accessToken: string): Promise<string | nu
     });
     if (!res.ok) return null;
     const json = await res.json() as MeResponse;
-    console.log('[tidl] /me response:', JSON.stringify(json));
 
     // Try display name / full name / username directly on the user object
     const attrs = json?.data?.attributes;
@@ -74,7 +71,6 @@ export async function fetchUserProfile(accessToken: string): Promise<string | nu
       });
       if (artistRes.ok) {
         const artistJson = await artistRes.json() as ArtistResponse;
-        console.log('[tidl] /artists response:', JSON.stringify(artistJson));
         return artistJson?.data?.attributes?.name || null;
       }
     }
@@ -91,8 +87,7 @@ export function decodeTidalJwtPayload(accessToken: string): TidalJwtPayload | nu
     if (!b64) return null;
     const padded = b64.padEnd(b64.length + (4 - (b64.length % 4)) % 4, '=');
     return JSON.parse(atob(padded.replace(/-/g, '+').replace(/_/g, '/'))) as TidalJwtPayload;
-  } catch (e) {
-    console.warn('[tidl] JWT decode failed:', e);
+  } catch {
     return null;
   }
 }
@@ -110,14 +105,10 @@ connectBtn.addEventListener('click', async () => {
     return;
   }
 
-  console.log('[tidl] Auth URL:', loginUrl);
-  console.log('[tidl] Redirect URI:', redirectUri);
-
   let redirectUrl: string | undefined;
   try {
     redirectUrl = await launchTidalAuth(loginUrl, redirectUri);
   } catch (err) {
-    console.error('[tidl] auth flow error:', err);
     showMessage(formatAuthLaunchError(err, redirectUri), true);
     return;
   }
@@ -131,14 +122,12 @@ connectBtn.addEventListener('click', async () => {
   const query = new URL(redirectUrl).search;
   try {
     await completeLogin(query);
-  } catch (err) {
-    console.error('[tidl] finalizeLogin error:', err);
+  } catch {
     showMessage('Failed to connect to Tidal.', true);
     return;
   }
 
   // Get the token from the SDK to fetch user profile
-  const { credentialsProvider } = await import('../shared/auth');
   const creds = await credentialsProvider.getCredentials();
   const accessToken = creds.token ?? '';
 
@@ -192,7 +181,6 @@ async function launchTidalAuth(loginUrl: string, redirectUri: string): Promise<s
     });
   } catch (err) {
     if (!isAuthorizationPageLoadError(err)) throw err;
-    console.warn('[tidl] launchWebAuthFlow failed, retrying in a normal Chrome popup:', err);
     showMessage('Chrome auth window failed. Opening Tidal login in a normal Chrome popup...');
     return launchTidalAuthPopup(loginUrl, redirectUri);
   }
@@ -258,6 +246,16 @@ async function launchTidalAuthPopup(loginUrl: string, redirectUri: string): Prom
 
 function isAuthRedirect(url: string, redirectUri: string): boolean {
   return url.startsWith(redirectUri);
+}
+
+async function hasStoredCredentials(): Promise<boolean> {
+  try {
+    await initAuth();
+    const creds = await credentialsProvider.getCredentials();
+    return Boolean(creds.token);
+  } catch {
+    return false;
+  }
 }
 
 function formatAuthLaunchError(err: unknown, redirectUri: string): string {

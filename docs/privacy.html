@@ -22,22 +22,23 @@
 </head>
 <body>
   <h1>tIDl — Privacy Policy</h1>
-  <p class="updated">Last updated: April 14, 2026</p>
+  <p class="updated">Last updated: May 3, 2026</p>
 
   <p>tIDl is a Chrome extension that lets you highlight text on any webpage, search TIDAL for matching tracks, and add those tracks to your favorites or playlists.</p>
 
   <h2>Data We Collect</h2>
   <p>tIDl collects only what is required for it to function:</p>
   <ul>
-    <li><strong>TIDAL OAuth tokens</strong> — when you sign in with your TIDAL account, an access token and refresh token are stored locally in Chrome's <code>chrome.storage.local</code>. These tokens are never transmitted to any server other than TIDAL's own authentication and API endpoints.</li>
-    <li><strong>Selected text</strong> — text you highlight is sent directly to the TIDAL Open API (<code>openapi.tidal.com</code>) to perform a search query. It is not logged or stored by this extension.</li>
+    <li><strong>TIDAL OAuth tokens</strong> — when you sign in with your TIDAL account, an access token and refresh token are stored locally by TIDAL's browser SDK using Chrome extension storage. These tokens are never transmitted to any server other than TIDAL's own authentication, API, and playback endpoints.</li>
+    <li><strong>Selected text</strong> — text you highlight and explicitly search is sent directly to the TIDAL Open API (<code>openapi.tidal.com</code>) to perform a search query. It is not logged or stored by this extension.</li>
+    <li><strong>Library metadata</strong> — playlist and favorite track identifiers may be cached locally so the extension can show faster add-to-library controls.</li>
   </ul>
 
   <h2>Data We Do Not Collect</h2>
   <ul>
     <li>We do not collect, transmit, or store any personal information on our own servers.</li>
     <li>We do not use analytics, crash reporting, or any third-party tracking services.</li>
-    <li>We do not read or access any browsing history, page content, or form data beyond the text you explicitly highlight and invoke the extension on.</li>
+    <li>We do not collect browsing history, page content, or form data. The content script runs on pages so it can detect highlighted text, but the extension only sends text after you click the tIDl search control or context-menu item.</li>
   </ul>
 
   <h2>Third-Party Services</h2>
@@ -50,7 +51,7 @@
   <p>Your use of these services is governed by <a href="https://tidal.com/privacy" target="_blank" rel="noopener">TIDAL's Privacy Policy</a>.</p>
 
   <h2>Local Storage</h2>
-  <p>OAuth tokens are stored using <code>chrome.storage.local</code>, which keeps data on your device only. This data is never synced across devices and is removed when you uninstall the extension or sign out.</p>
+  <p>OAuth tokens, display name, country code, playlist cache, favorite cache, and the popup preference are stored using Chrome extension storage on your device. This data is never synced by tIDl and is removed when you uninstall the extension or sign out.</p>
 
   <h2>Permissions</h2>
   <p>tIDl requests the following Chrome permissions:</p>
@@ -58,6 +59,9 @@
     <li><strong>contextMenus</strong> — to add a right-click menu item for searching selected text</li>
     <li><strong>storage</strong> — to persist your login tokens locally</li>
     <li><strong>identity</strong> — to launch the TIDAL OAuth sign-in flow via Chrome's identity API</li>
+    <li><strong>tabs</strong> — to observe the TIDAL OAuth fallback popup redirect if Chrome's identity window cannot load it</li>
+    <li><strong>all URLs content script access</strong> — to show the optional search button beside highlighted text on any webpage</li>
+    <li><strong>TIDAL host permissions</strong> — to authenticate with TIDAL, search the TIDAL catalog, update favorites/playlists, and play previews through TIDAL services</li>
   </ul>
 
   <h2>Changes to This Policy</h2>

@@ -37,7 +37,7 @@ describe('openTidalLink', () => {
   });
 
   it('appends and removes an anchor with appUrl href', () => {
-    openTidalLink('tidal://track/123', 'https://tidal.com/track/123');
+    expect(openTidalLink('tidal://track/123', 'https://tidal.com/track/123')).toBe(true);
     // Anchor is removed synchronously after click
     expect(document.querySelector('a[href="tidal://track/123"]')).toBeNull();
   });
@@ -46,12 +46,30 @@ describe('openTidalLink', () => {
     openTidalLink('tidal://track/123', 'https://tidal.com/track/123');
     expect(window.open).not.toHaveBeenCalled();
     vi.advanceTimersByTime(600);
-    expect(window.open).toHaveBeenCalledWith('https://tidal.com/track/123', '_blank');
+    expect(window.open).toHaveBeenCalledWith('https://tidal.com/track/123', '_blank', 'noopener,noreferrer');
   });
 
   it('does not open webUrl if window blur fires before 600ms', () => {
     openTidalLink('tidal://track/123', 'https://tidal.com/track/123');
     window.dispatchEvent(new Event('blur'));
+    vi.advanceTimersByTime(600);
+    expect(window.open).not.toHaveBeenCalled();
+  });
+
+  it('rejects mismatched app and web URLs', () => {
+    expect(openTidalLink('tidal://track/123', 'https://tidal.com/artist/123')).toBe(false);
+    vi.advanceTimersByTime(600);
+    expect(window.open).not.toHaveBeenCalled();
+  });
+
+  it('rejects non-Tidal web URLs', () => {
+    expect(openTidalLink('tidal://track/123', 'https://example.com/track/123')).toBe(false);
+    vi.advanceTimersByTime(600);
+    expect(window.open).not.toHaveBeenCalled();
+  });
+
+  it('rejects unsafe ids', () => {
+    expect(openTidalLink('tidal://track/..%2Fsecret', 'https://tidal.com/track/..%2Fsecret')).toBe(false);
     vi.advanceTimersByTime(600);
     expect(window.open).not.toHaveBeenCalled();
   });

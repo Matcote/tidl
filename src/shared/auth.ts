@@ -9,7 +9,7 @@ import {
   logout,
 } from '@tidal-music/auth';
 import type { StorageAdapter } from '@tidal-music/auth';
-import { CLIENT_ID, CLIENT_SECRET, SCOPES } from './constants';
+import { CLIENT_ID, SCOPES } from './constants';
 
 const STORAGE_KEY = 'tidl-auth';
 
@@ -42,7 +42,6 @@ export async function initAuth(): Promise<void> {
   const clientUniqueKey = await getClientUniqueKey();
   await init({
     clientId: CLIENT_ID,
-    ...(CLIENT_SECRET ? { clientSecret: CLIENT_SECRET } : {}),
     clientUniqueKey,
     credentialsStorageKey: STORAGE_KEY,
     scopes: SCOPES.split(' '),

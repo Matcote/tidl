@@ -18,7 +18,7 @@ vi.mock('@tidal-music/player', () => ({
   getPlaybackState: vi.fn().mockReturnValue('IDLE'),
 }));
 
-import { toggleFavoriteInline, togglePlaylistPickerInline, isEditableTarget } from '../src/content';
+import { toggleFavoriteInline, togglePlaylistPickerInline, isEditableTarget, renderTracks } from '../src/content';
 
 // panelPlaylists and tidalPanel are module-level in content.ts.
 // We test the exported functions directly, providing a panel fixture.
@@ -142,5 +142,33 @@ describe('togglePlaylistPickerInline — no panel', () => {
     togglePlaylistPickerInline(e, 'track-1', btn);
     // No throw, no side effects — button innerHTML unchanged
     expect(btn.querySelector('svg')).not.toBeNull();
+  });
+});
+
+describe('renderTracks security', () => {
+  it('renders API-provided names and ids without creating HTML from them', () => {
+    const list = document.createElement('ul');
+    document.body.appendChild(list);
+
+    renderTracks([
+      {
+        id: '123"><img src=x onerror=alert(1)>',
+        title: 'Track <img src=x onerror=alert(1)>',
+        artists: [{ id: 'artist"><svg onload=alert(1)>', name: 'Artist <script>alert(1)</script>' }],
+        duration: '1:23',
+        artUrl: 'javascript:alert(1)',
+      },
+    ], list);
+
+    expect(list.querySelector('script')).toBeNull();
+    expect(list.querySelector('img[src="x"]')).toBeNull();
+    expect(list.textContent).toContain('Track <img src=x onerror=alert(1)>');
+    expect(list.textContent).toContain('Artist <script>alert(1)</script>');
+
+    const trackLink = list.querySelector<HTMLAnchorElement>('.tidp-title .tidp-link')!;
+    expect(trackLink.dataset['webUrl']).toBe(
+      'https://tidal.com/track/123%22%3E%3Cimg%20src%3Dx%20onerror%3Dalert(1)%3E',
+    );
+    expect(list.querySelector<HTMLImageElement>('.tidp-art')!.src).toContain('data:image/svg+xml');
   });
 });

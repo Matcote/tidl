@@ -7,12 +7,10 @@ import { TIDAL_API_BASE } from './shared/constants';
 import { initAuth, credentialsProvider } from './shared/auth';
 import type {
   ExtensionMessage,
-  OAuthTokenResponse,
   SearchResponse,
   PlaylistsResponse,
   MutationResponse,
   FavoritesResponse,
-  CredentialsResponse,
   TidalJsonApiResource,
 } from './shared/types';
 
@@ -29,6 +27,12 @@ type RelationshipItemsDocument =
   components['schemas']['UserCollectionTracks_Items_Multi_Relationship_Data_Document'];
 
 let apiClient: TidalApiClient | null = null;
+const MAX_QUERY_LENGTH = 512;
+const TIDAL_ID_RE = /^[A-Za-z0-9_-]{1,128}$/;
+
+type MessageValidation =
+  | { ok: true; message: ExtensionMessage }
+  | { ok: false; error: string };
 
 // ─── Context Menu Setup ──────────────────────────────────────────────────────
 
@@ -55,7 +59,8 @@ chrome.contextMenus.onClicked.addListener(async (info) => {
     return;
   }
 
-  const query = (info.selectionText ?? '').trim();
+  const query = normalizeQuery(info.selectionText);
+  if (!query) return;
   await chrome.storage.session.set({ tidlQuery: query });
 
   chrome.windows.create({
@@ -68,11 +73,21 @@ chrome.contextMenus.onClicked.addListener(async (info) => {
 
 // ─── Message Handler ─────────────────────────────────────────────────────────
 
-chrome.runtime.onMessage.addListener((msg: ExtensionMessage, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((rawMsg: unknown, sender, sendResponse) => {
+  const validation = validateExtensionMessage(rawMsg, sender);
+  if (!validation.ok) {
+    sendResponse({ error: validation.error });
+    return false;
+  }
+
+  const msg = validation.message;
   switch (msg.type) {
     case 'OPEN_RESULTS':
-      openResults(msg.query);
-      return false;
+      openResults(msg.query).then(
+        () => sendResponse({ ok: true }),
+        (err) => sendResponse({ error: formatError(err) }),
+      );
+      return true;
     case 'SEARCH':
       handleSearch(msg.query).then(sendResponse);
       return true;
@@ -91,12 +106,6 @@ chrome.runtime.onMessage.addListener((msg: ExtensionMessage, _sender, sendRespon
     case 'GET_FAVORITES':
       handleGetFavorites(msg.forceRefresh).then(sendResponse);
       return true;
-    case 'GET_CREDENTIALS':
-      handleGetCredentials().then(sendResponse);
-      return true;
-    case 'STORE_TOKENS':
-      storeTokens(msg.data).then(() => sendResponse({ ok: true }));
-      return true;
     case 'DEV_RELOAD_EXTENSION':
       if (!process.env.TIDL_DEV_SERVER_URL) {
         sendResponse({ error: 'Dev reload is only available from npm run dev.' });
@@ -108,13 +117,63 @@ chrome.runtime.onMessage.addListener((msg: ExtensionMessage, _sender, sendRespon
   }
 });
 
+export function validateExtensionMessage(
+  value: unknown,
+  sender: chrome.runtime.MessageSender = {},
+): MessageValidation {
+  if (!isTrustedSender(sender)) return { ok: false, error: 'Invalid message sender' };
+  if (!isPlainObject(value) || typeof value['type'] !== 'string') {
+    return { ok: false, error: 'Invalid message' };
+  }
+
+  switch (value['type']) {
+    case 'SEARCH':
+    case 'OPEN_RESULTS': {
+      const query = normalizeQuery(value['query']);
+      if (!query) return { ok: false, error: 'Invalid query' };
+      return { ok: true, message: { type: value['type'], query } };
+    }
+    case 'GET_PLAYLISTS':
+    case 'GET_FAVORITES': {
+      const forceRefresh = normalizeOptionalBoolean(value['forceRefresh']);
+      if (forceRefresh === null) return { ok: false, error: 'Invalid message' };
+      return {
+        ok: true,
+        message: forceRefresh === undefined
+          ? { type: value['type'] }
+          : { type: value['type'], forceRefresh },
+      };
+    }
+    case 'ADD_FAVORITE':
+    case 'REMOVE_FAVORITE': {
+      if (!isValidTidalId(value['trackId'])) return { ok: false, error: 'Invalid track id' };
+      return { ok: true, message: { type: value['type'], trackId: value['trackId'] } };
+    }
+    case 'ADD_TO_PLAYLIST': {
+      if (!isValidTidalId(value['trackId'])) return { ok: false, error: 'Invalid track id' };
+      if (!isValidTidalId(value['playlistId'])) return { ok: false, error: 'Invalid playlist id' };
+      return {
+        ok: true,
+        message: { type: 'ADD_TO_PLAYLIST', trackId: value['trackId'], playlistId: value['playlistId'] },
+      };
+    }
+    case 'DEV_RELOAD_EXTENSION':
+      return { ok: true, message: { type: 'DEV_RELOAD_EXTENSION' } };
+    default:
+      return { ok: false, error: 'Invalid message type' };
+  }
+}
+
 async function openResults(query: string): Promise<void> {
+  const normalizedQuery = normalizeQuery(query);
+  if (!normalizedQuery) return;
+
   const token = await getValidToken();
   if (!token) {
     chrome.runtime.openOptionsPage();
     return;
   }
-  await chrome.storage.session.set({ tidlQuery: query.trim() });
+  await chrome.storage.session.set({ tidlQuery: normalizedQuery });
   chrome.windows.create({
     url: chrome.runtime.getURL('results/results.html'),
     type: 'popup',
@@ -123,26 +182,18 @@ async function openResults(query: string): Promise<void> {
   });
 }
 
-async function handleGetCredentials(): Promise<CredentialsResponse> {
-  try {
-    await initAuth();
-    const creds = await credentialsProvider.getCredentials();
-    if (!creds.token) return { error: 'Not authenticated' };
-    return { token: creds.token, clientId: creds.clientId, userId: creds.userId ?? undefined };
-  } catch {
-    return { error: 'Not authenticated' };
-  }
-}
-
 // ─── Tidal API Calls ─────────────────────────────────────────────────────────
 
 export async function handleSearch(query: string): Promise<SearchResponse> {
+  const normalizedQuery = normalizeQuery(query);
+  if (!normalizedQuery) return { error: 'Invalid query' };
+
   const stored = await chrome.storage.local.get('countryCode') as { countryCode?: string };
   const countryCode = stored.countryCode ?? 'CA';
   const result = await tidalApiRequest<SearchDocument>(() =>
     getApiClient().GET('/searchResults/{id}', {
       params: {
-        path: { id: query },
+        path: { id: normalizedQuery },
         query: {
           countryCode,
           include: ['tracks', 'tracks.artists', 'tracks.albums', 'tracks.albums.coverArt'],
@@ -150,7 +201,6 @@ export async function handleSearch(query: string): Promise<SearchResponse> {
       },
     }),
   );
-  console.log('[tidl] Search result:', JSON.stringify(result).slice(0, 500));
   return result as SearchResponse;
 }
 
@@ -207,11 +257,12 @@ export async function handleGetPlaylists(forceRefresh = false): Promise<Playlist
     playlistsCache: playlists,
     playlistsLastFetched: Date.now(),
   });
-  console.log('[tidl] Playlists result:', JSON.stringify({ data: playlists }).slice(0, 500));
   return { data: playlists };
 }
 
 export async function handleAddFavorite(trackId: string): Promise<MutationResponse> {
+  if (!isValidTidalId(trackId)) return { error: 'Invalid track id' };
+
   let result = await tidalApiMutation(() =>
     getApiClient().POST('/userCollectionTracks/{id}/relationships/items', {
       params: {
@@ -239,6 +290,8 @@ export async function handleAddFavorite(trackId: string): Promise<MutationRespon
 }
 
 export async function handleRemoveFavorite(trackId: string): Promise<MutationResponse> {
+  if (!isValidTidalId(trackId)) return { error: 'Invalid track id' };
+
   let result = await tidalApiMutation(() =>
     getApiClient().DELETE('/userCollectionTracks/{id}/relationships/items', {
       params: { path: { id: 'me' } },
@@ -260,6 +313,9 @@ export async function handleRemoveFavorite(trackId: string): Promise<MutationRes
 }
 
 export async function handleAddToPlaylist(trackId: string, playlistId: string): Promise<MutationResponse> {
+  if (!isValidTidalId(trackId)) return { error: 'Invalid track id' };
+  if (!isValidTidalId(playlistId)) return { error: 'Invalid playlist id' };
+
   const stored = await chrome.storage.local.get('countryCode') as { countryCode?: string };
   const countryCode = stored.countryCode ?? 'CA';
   let result = await tidalApiMutation(() =>
@@ -344,8 +400,7 @@ export async function handleGetFavorites(forceRefresh = false): Promise<Favorite
 
     const trackIds = await fetchAllFavoriteIds();
     return { trackIds };
-  } catch (err) {
-    console.error('[tidl] Failed to fetch favorites:', err);
+  } catch {
     return { trackIds: [] };
   }
 }
@@ -442,10 +497,31 @@ export async function getValidToken(): Promise<string | null> {
   }
 }
 
-export async function storeTokens(data: OAuthTokenResponse): Promise<void> {
-  // Legacy handler kept for the STORE_TOKENS message type.
-  // New auth flow stores tokens via the SDK; this is a no-op fallback.
-  if (data.user_id !== undefined) {
-    await chrome.storage.local.set({ userId: String(data.user_id) });
-  }
+function isTrustedSender(sender: chrome.runtime.MessageSender): boolean {
+  return !sender.id || sender.id === chrome.runtime.id;
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function normalizeQuery(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const query = value.trim();
+  if (!query || query.length > MAX_QUERY_LENGTH) return null;
+  return query;
+}
+
+function normalizeOptionalBoolean(value: unknown): boolean | undefined | null {
+  if (value === undefined) return undefined;
+  if (typeof value === 'boolean') return value;
+  return null;
+}
+
+function isValidTidalId(value: unknown): value is string {
+  return typeof value === 'string' && TIDAL_ID_RE.test(value);
+}
+
+function formatError(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
 }

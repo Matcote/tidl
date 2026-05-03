@@ -16,11 +16,11 @@ A Chrome extension for identifying tracks from DJ sets. Highlight text on any we
 
 ## Setup (for contributors)
 
-You need your own Tidal OAuth app credentials to build from source. The published Chrome Web Store extension works out of the box for end users.
+You need your own Tidal OAuth client ID to build from source. The extension uses TIDAL's Authorization Code + PKCE flow as a public browser client, so a client secret must not be bundled. The published Chrome Web Store extension works out of the box for end users.
 
 1. Register an OAuth app at [developer.tidal.com](https://developer.tidal.com)
    - Set the redirect URI to `https://<your-extension-id>.chromiumapp.org/`
-2. Copy `.env.example` to `.env` and fill in your credentials:
+2. Copy `.env.example` to `.env` and fill in your client ID:
    ```
    cp .env.example .env
    ```
@@ -46,6 +46,7 @@ npm run dev        # watch, launch Chrome with dist/, hot-swap CSS, auto-reload 
 npm run dev:chrome # same dev loop, using your normal Chrome profile/extensions
 npm run typecheck  # type-check only
 npm test           # run tests
+npm run package    # build, scan release artifacts, and create releases/tidl-<version>.zip
 ```
 
 `npm run dev` opens a dedicated Chrome profile from `.tidl-chrome-profile/`,
@@ -95,6 +96,12 @@ profile already has the registered unpacked-extension ID.
 If Chrome's built-in auth window still fails, tIDl falls back to opening Tidal
 login in a normal Chrome popup and captures the final chromiumapp redirect from
 that popup. The `tabs` permission exists for this fallback.
+
+## Release security checks
+
+Do not publish an old zip from `releases/`. Run `npm run package` from a clean tree and use the newly generated zip. Packaging fails if release artifacts contain source maps, source-map references, the dev reload URL marker, the client-secret env marker, or the configured `TIDAL_CLIENT_SECRET` value from your local environment.
+
+If a client secret has ever been built into `dist/` or a release zip, rotate or recreate that TIDAL app credential before submitting a public release.
 
 ## License
 
