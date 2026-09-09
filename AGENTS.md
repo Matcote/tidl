@@ -75,3 +75,11 @@ Uses `https://openapi.tidal.com/v2/` (JSON:API format). Full reference: https://
 - `playlists/{playlistId}/relationships/items` — add to playlist
 
 OAuth tokens come from `https://auth.tidal.com/v1/oauth2/token`.
+
+## Releases
+
+See `docs/releases.md` for the one-button GitHub Actions workflow, Google account
+setup, dry runs, and recovery. `npm run release -- prepare --dry-run` validates
+without publishing. Live operations require a main-branch manual workflow run.
+Never rebuild a tagged release during recovery: resume using its original ZIP,
+checksum, and tag-bound metadata.

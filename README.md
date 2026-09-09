@@ -16,7 +16,7 @@ A Chrome extension for identifying tracks from DJ sets. Highlight text on any we
 
 ## Setup (for contributors)
 
-You need your own Tidal OAuth client ID to build from source. The extension uses TIDAL's Authorization Code + PKCE flow as a public browser client, so a client secret must not be bundled. The published Chrome Web Store extension works out of the box for end users.
+You need your own Tidal OAuth client ID to build from source. The extension uses TIDAL's Authorization Code + PKCE flow as a public browser client, so a client secret must not be bundled. Store builds use the publisher’s configured client ID, so end users do not need their own.
 
 1. Register an OAuth app at [developer.tidal.com](https://developer.tidal.com)
    - Set the redirect URI to `https://<your-extension-id>.chromiumapp.org/`
@@ -96,6 +96,16 @@ profile already has the registered unpacked-extension ID.
 If Chrome's built-in auth window still fails, tIDl falls back to opening Tidal
 login in a normal Chrome popup and captures the final chromiumapp redirect from
 that popup. The `tabs` permission exists for this fallback.
+
+## Releasing
+
+Use **GitHub Actions → Release → Run workflow** on `main`. Choose a version bump;
+the workflow tests, packages, tags, creates the GitHub release, and submits the
+same ZIP to Chrome Web Store for automatic publication after review.
+
+Run with **dry_run=true** first. Dry runs and CI work before Google setup is
+complete; live publishing requires an existing store item and the one-time
+publisher connection. See [release setup, validation, and recovery](docs/releases.md).
 
 ## Release security checks
 

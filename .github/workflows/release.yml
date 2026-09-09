@@ -1,0 +1,186 @@
+name: Release
+run-name: Release ${{ inputs.operation }} ${{ inputs.release_tag || inputs.bump }}${{ inputs.dry_run && ' (dry run)' || '' }}
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Prepare a release, resume its submission, or inspect store status
+        type: choice
+        options: [prepare, resume, status]
+        default: prepare
+      bump:
+        description: Version increment (prepare only)
+        type: choice
+        options: [patch, minor, major]
+        default: patch
+      dry_run:
+        description: Validate/package only; do not publish
+        type: boolean
+        default: false
+      release_tag:
+        description: Existing vX.Y.Z tag (required for resume, optional for status)
+        type: string
+      source_run_id:
+        description: Original preparation run ID (only if GitHub release assets are missing)
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: tidl-release
+  cancel-in-progress: false
+jobs:
+  dry-run:
+    if: inputs.dry_run && inputs.operation != 'status'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      HUSKY: '0'
+      TIDAL_CLIENT_ID: ${{ vars.TIDAL_CLIENT_ID || 'tidl-ci-fixture-not-for-publication' }}
+      RELEASE_TAG: ${{ inputs.release_tag }}
+      RELEASE_BUMP: ${{ inputs.bump }}
+      SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+      GH_TOKEN: ${{ github.token }}
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - name: Require main
+        run: test "$GITHUB_REF" = refs/heads/main
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - if: inputs.operation == 'prepare'
+        run: npm run release -- prepare --dry-run
+      - if: inputs.operation == 'resume'
+        run: npm run release -- resume --dry-run
+      - name: Retain dry-run package for inspection
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: dry-run-${{ github.run_id }}-${{ github.run_attempt }}
+          path: releases/
+          if-no-files-found: ignore
+          retention-days: 90
+  status:
+    if: inputs.operation == 'status'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Require main
+        run: test "$GITHUB_REF" = refs/heads/main
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        id: auth
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/chromewebstore.readonly
+          create_credentials_file: false
+      - run: npm run release -- status
+        env:
+          CWS_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+          CWS_PUBLISHER_ID: ${{ vars.CWS_PUBLISHER_ID }}
+          CWS_EXTENSION_ID: ${{ vars.CWS_EXTENSION_ID }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+  release:
+    if: '!inputs.dry_run && inputs.operation != ''status'''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      contents: write
+      actions: read
+      id-token: write
+    env:
+      HUSKY: '0'
+      GH_TOKEN: ${{ github.token }}
+      TIDAL_CLIENT_ID: ${{ vars.TIDAL_CLIENT_ID }}
+      CWS_PUBLISHER_ID: ${{ vars.CWS_PUBLISHER_ID }}
+      CWS_EXTENSION_ID: ${{ vars.CWS_EXTENSION_ID }}
+      RELEASE_TAG: ${{ inputs.release_tag }}
+      RELEASE_BUMP: ${{ inputs.bump }}
+      SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+    steps:
+      - name: Require main
+        run: test "$GITHUB_REF" = refs/heads/main
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Configure release author
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        id: preflight-auth
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/chromewebstore
+          create_credentials_file: false
+      - name: Validate and prepare release
+        if: inputs.operation == 'prepare'
+        id: prepare
+        run: npm run release -- prepare
+        env:
+          CWS_ACCESS_TOKEN: ${{ steps.preflight-auth.outputs.access_token }}
+      - name: Retain original package before pushing refs
+        if: inputs.operation == 'prepare' && steps.prepare.outcome == 'success'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ${{ steps.prepare.outputs.artifact }}
+          path: releases/
+          if-no-files-found: error
+          retention-days: 90
+      - name: Push release commit/tag and create GitHub release
+        if: inputs.operation == 'prepare'
+        run: npm run release -- finalize
+        env:
+          RELEASE_TAG: ${{ steps.prepare.outputs.tag }}
+      - name: Refresh credentials immediately before submission
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        id: publish-auth
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/chromewebstore
+          create_credentials_file: false
+      - name: Submit prepared release
+        if: inputs.operation == 'prepare'
+        run: npm run release -- publish
+        env:
+          RELEASE_TAG: ${{ steps.prepare.outputs.tag }}
+          CWS_ACCESS_TOKEN: ${{ steps.publish-auth.outputs.access_token }}
+      - name: Resume original release without rebuilding
+        if: inputs.operation == 'resume'
+        run: npm run release -- resume
+        env:
+          CWS_ACCESS_TOKEN: ${{ steps.publish-auth.outputs.access_token }}
+      - name: Recovery instructions
+        if: failure()
+        run: |
+          echo 'Release stopped. See the failed step. If the tag was pushed, use Resume with that tag and the original preparation run ID if assets are missing. Never rebuild an existing version.' >> "$GITHUB_STEP_SUMMARY"
+          echo "Preparation run: $GITHUB_RUN_ID" >> "$GITHUB_STEP_SUMMARY"

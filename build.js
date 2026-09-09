@@ -5,22 +5,8 @@ const watch = process.argv.includes('--watch');
 const devServerUrl = process.env.TIDL_DEV_SERVER_URL || '';
 const isDevBuild = watch || Boolean(devServerUrl);
 
-function loadEnv() {
-  const env = {};
-  if (fs.existsSync('.env')) {
-    fs.readFileSync('.env', 'utf8').split('\n').forEach(line => {
-      const eqIdx = line.indexOf('=');
-      if (eqIdx > 0) {
-        const key = line.slice(0, eqIdx).trim();
-        const val = line.slice(eqIdx + 1).trim();
-        if (key) env[key] = val;
-      }
-    });
-  }
-  return env;
-}
-
-const env = loadEnv();
+const { buildEnv } = require('./scripts/lib/build-env');
+const env = buildEnv();
 
 const sharedConfig = {
   bundle: true,
@@ -29,7 +15,7 @@ const sharedConfig = {
   target: ['chrome120'],
   sourcemap: isDevBuild,
   define: {
-    'process.env.TIDAL_CLIENT_ID':     JSON.stringify(env.TIDAL_CLIENT_ID || ''),
+    'process.env.TIDAL_CLIENT_ID':     JSON.stringify(env.clientId),
     'process.env.TIDL_DEV_SERVER_URL': JSON.stringify(devServerUrl),
   },
 };

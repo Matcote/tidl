@@ -10,3 +10,6 @@ releases/
 /content.js
 /options/options.js
 /results/results.js
+
+# Short-lived Google Actions credentials
+gha-creds-*.json
