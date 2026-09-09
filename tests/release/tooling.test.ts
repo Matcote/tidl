@@ -175,6 +175,10 @@ describe('prepare, finalize, and artifact recovery', () => {
 });
 
 describe('production packaging', () => {
+  it('can compare downloaded release assets larger than the default subprocess buffer', () => {
+    const bytes = pkg.run(process.execPath, ['-e', 'process.stdout.write(Buffer.alloc(2 * 1024 * 1024))'], process.cwd(), { encoding: 'buffer' });
+    expect(bytes.length).toBe(2 * 1024 * 1024);
+  });
   it('builds a ZIP with manifest at root and a verifiable checksum', () => {
     const { cwd } = fixture();
     fs.writeFileSync(path.join(cwd, 'build.js'), `const fs=require('fs');fs.mkdirSync('dist',{recursive:true});fs.copyFileSync('manifest.json','dist/manifest.json');fs.writeFileSync('dist/background.js','production code');`);

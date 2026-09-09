@@ -5,7 +5,7 @@ const { execFileSync } = require('node:child_process');
 const { releaseEnv } = require('./build-env');
 const VERSION_FILES = ['package.json', 'package-lock.json', 'manifest.json'];
 function run(command, args, cwd = process.cwd(), options = {}) {
-  return execFileSync(command, args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], ...options });
+  return execFileSync(command, args, { cwd, encoding: 'utf8', maxBuffer: 100 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'], ...options });
 }
 function versionParts(version) {
   if (!/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(version)) throw new Error(`Invalid release version: ${version}`);
