@@ -3,6 +3,7 @@ import { http, HttpResponse } from 'msw';
 import { server } from './setup/msw-server';
 import { seedLocalStorage, getLocalStore } from './setup/chrome-mocks';
 import { TIDAL_API_BASE } from '../src/shared/constants';
+import { extractTracks } from '../src/shared/tracks';
 
 // Mock the auth module before importing background
 const defaultCreds = {
@@ -40,7 +41,7 @@ describe('validateExtensionMessage', () => {
   });
 
   it('rejects oversized search queries', () => {
-    const result = bg.validateExtensionMessage({ type: 'SEARCH', query: 'x'.repeat(513) });
+    const result = bg.validateExtensionMessage({ type: 'SEARCH', query: 'x'.repeat(257) });
     expect(result).toEqual({ ok: false, error: 'Invalid query' });
   });
 
@@ -85,20 +86,111 @@ describe('getValidToken', () => {
 });
 
 describe('handleSearch', () => {
-  it('requests the correct URL with query and countryCode', async () => {
+  it.each(['silicon', '  Björk / AC/DC & 100% + 🎵?  '])(
+    'passes %s as a query filter and follows the server-issued ID', async (query) => {
+      const opaqueId = 'opaque:result/+==';
+      const calls: string[] = [];
+      server.use(
+        http.get(`${TIDAL_API_BASE}/searchResults`, ({ request }) => {
+          calls.push('lookup');
+          const url = new URL(request.url);
+          expect(url.searchParams.get('filter[query]')).toBe(query.trim());
+          expect(url.searchParams.get('countryCode')).toBe('CA');
+          expect(url.searchParams.has('include')).toBe(false);
+          return HttpResponse.json({ data: [{ id: opaqueId, type: 'searchResults' }] });
+        }),
+        http.get(`${TIDAL_API_BASE}/searchResults/:id/relationships/tracks`, ({ params }) => {
+          calls.push('tracks');
+          // Reproduce the production API's rejection of plain text as an ID.
+          if (params.id !== opaqueId) {
+            return HttpResponse.json({ errors: [{ code: 'INVALID_RESOURCE_ID' }] }, { status: 400 });
+          }
+          return HttpResponse.json({ data: [{ id: 'track-1', type: 'tracks' }] });
+        }),
+      );
+      const result = await bg.handleSearch(query);
+      expect(result.error).toBeUndefined();
+      expect(calls).toEqual(['lookup', 'tracks']);
+      expect((Array.isArray(result.data) ? result.data[0] : result.data)?.relationships?.tracks?.data)
+        .toEqual([{ id: 'track-1', type: 'tracks' }]);
+    },
+  );
+
+  it('uses track identifiers already returned by the query endpoint', async () => {
+    let relationshipCalls = 0;
+    server.use(
+      http.get(`${TIDAL_API_BASE}/searchResults`, () => HttpResponse.json({
+        data: [{ id: 'opaque-id', type: 'searchResults', relationships: {
+          tracks: { data: [{ id: 'track-1', type: 'tracks' }] },
+        } }],
+      })),
+      http.get(`${TIDAL_API_BASE}/searchResults/:id/relationships/tracks`, () => {
+        relationshipCalls++;
+        return new HttpResponse(null, { status: 500 });
+      }),
+    );
+    const result = await bg.handleSearch('silicon');
+    expect(result.error).toBeUndefined();
+    expect(relationshipCalls).toBe(0);
+    expect((result.data as { id: string }[])[0]?.id).toBe('opaque-id');
+  });
+
+  it('returns an empty collection without constructing an ID', async () => {
+    server.use(http.get(`${TIDAL_API_BASE}/searchResults`, () => HttpResponse.json({ data: [] })));
+    expect(await bg.handleSearch('no results')).toEqual({ data: [], included: [] });
+  });
+
+  it.each([400, 401, 403])('preserves a %s lookup error without calling suggestions', async (status) => {
+    let suggestionCalls = 0;
+    server.use(
+      http.get(`${TIDAL_API_BASE}/searchResults`, () => new HttpResponse(null, { status })),
+      http.get(`${TIDAL_API_BASE}/searchSuggestions`, () => {
+        suggestionCalls++;
+        return HttpResponse.json({ data: [] });
+      }),
+    );
+    expect(await bg.handleSearch('silicon')).toMatchObject({ status });
+    expect(suggestionCalls).toBe(0);
+  });
+
+  it('uses the suggestions query endpoint after a search lookup outage', async () => {
+    server.use(
+      http.get(`${TIDAL_API_BASE}/searchResults`, () => new HttpResponse(null, { status: 503 })),
+      http.get(`${TIDAL_API_BASE}/searchSuggestions`, ({ request }) => {
+        expect(new URL(request.url).searchParams.get('filter[query]')).toBe('silicon');
+        return HttpResponse.json({ data: [{ id: 'suggestion-id', type: 'searchSuggestions', relationships: {
+          directHits: { data: [{ id: 'track-2', type: 'tracks' }, { id: 'artist-1', type: 'artists' }] },
+        } }] });
+      }),
+    );
+    const result = await bg.handleSearch('silicon');
+    expect((Array.isArray(result.data) ? result.data[0] : result.data)?.relationships?.tracks?.data)
+      .toEqual([{ id: 'track-2', type: 'tracks' }]);
+  });
+
+  it('enforces the API query length limit before sending a request', async () => {
+    expect(await bg.handleSearch('x'.repeat(257))).toEqual({ error: 'Invalid query' });
+    expect((await bg.handleSearch('x'.repeat(256))).error).toBeUndefined();
+  });
+
+  it('requests the search tracks relationship URL without include parameters', async () => {
     seedLocalStorage({ countryCode: 'US' });
 
     let capturedUrl: string | undefined;
     server.use(
-      http.get(`${TIDAL_API_BASE}/searchResults/:query`, ({ request }) => {
+      http.get(`${TIDAL_API_BASE}/searchResults/:query/relationships/tracks`, ({ request }) => {
         capturedUrl = request.url;
         return HttpResponse.json({ data: [], included: [] });
       }),
     );
 
     await bg.handleSearch('my query');
-    expect(capturedUrl).toContain('/searchResults/my%20query');
+    expect(capturedUrl).toContain('/searchResults/opaque-search-id/relationships/tracks');
     expect(capturedUrl).toContain('countryCode=US');
+    expect(capturedUrl).not.toContain('include=');
+    expect(capturedUrl).not.toContain('tracks.artists');
+    expect(capturedUrl).not.toContain('tracks.albums');
+    expect(capturedUrl).not.toContain('coverArt');
   });
 
   it('sends Authorization header', async () => {
@@ -106,7 +198,7 @@ describe('handleSearch', () => {
 
     let authHeader: string | null = null;
     server.use(
-      http.get(`${TIDAL_API_BASE}/searchResults/:query`, ({ request }) => {
+      http.get(`${TIDAL_API_BASE}/searchResults/:query/relationships/tracks`, ({ request }) => {
         authHeader = request.headers.get('Authorization');
         return HttpResponse.json({ data: [], included: [] });
       }),
@@ -116,16 +208,159 @@ describe('handleSearch', () => {
     expect(authHeader).toBe('Bearer test-token');
   });
 
-  it('returns parsed response body', async () => {
-    const fixture = { data: [{ id: 'sr1', type: 'searchResults' }], included: [] };
+  it('returns a search response from track relationship results', async () => {
+    const fixture = {
+      data: [
+        { id: 'track-1', type: 'tracks' },
+      ],
+      included: [],
+    };
     server.use(
-      http.get(`${TIDAL_API_BASE}/searchResults/:query`, () =>
+      http.get(`${TIDAL_API_BASE}/searchResults/:query/relationships/tracks`, () =>
         HttpResponse.json(fixture),
       ),
     );
 
     const result = await bg.handleSearch('test');
-    expect(result).toEqual(fixture);
+    expect(result.data).toEqual({
+      id: 'opaque-search-id',
+      type: 'searchResults',
+      relationships: {
+        tracks: {
+          data: [{ id: 'track-1', type: 'tracks' }],
+        },
+      },
+    });
+  });
+
+  it('hydrates search tracks through supported track and album endpoints', async () => {
+    seedLocalStorage({ countryCode: 'US' });
+
+    let tracksUrl: string | undefined;
+    let albumsUrl: string | undefined;
+
+    server.use(
+      http.get(`${TIDAL_API_BASE}/searchResults/:query`, () =>
+        new HttpResponse(null, { status: 500 }),
+      ),
+      http.get(`${TIDAL_API_BASE}/searchResults/:query/relationships/tracks`, () =>
+        HttpResponse.json({
+          data: [
+            { id: 'track-1', type: 'tracks' },
+          ],
+          included: [
+            {
+              id: 'track-1',
+              type: 'tracks',
+              attributes: { title: 'Unhydrated' },
+            },
+          ],
+        }),
+      ),
+      http.get(`${TIDAL_API_BASE}/tracks`, ({ request }) => {
+        tracksUrl = request.url;
+        return HttpResponse.json({
+          data: [
+            {
+              id: 'track-1',
+              type: 'tracks',
+              attributes: { title: 'Windowlicker', duration: 'PT6M7S' },
+              relationships: {
+                artists: { data: [{ id: 'artist-1', type: 'artists' }] },
+                albums: { data: [{ id: 'album-1', type: 'albums' }] },
+              },
+            },
+          ],
+          included: [
+            { id: 'artist-1', type: 'artists', attributes: { name: 'Aphex Twin' } },
+            {
+              id: 'album-1',
+              type: 'albums',
+              attributes: { title: 'Windowlicker' },
+            },
+          ],
+        });
+      }),
+      http.get(`${TIDAL_API_BASE}/albums`, ({ request }) => {
+        albumsUrl = request.url;
+        return HttpResponse.json({
+          data: [
+            {
+              id: 'album-1',
+              type: 'albums',
+              attributes: { title: 'Windowlicker' },
+              relationships: {
+                coverArt: { data: [{ id: 'art-1', type: 'artworks' }] },
+              },
+            },
+          ],
+          included: [
+            {
+              id: 'art-1',
+              type: 'artworks',
+              attributes: {
+                files: [
+                  { href: 'https://resources.tidal.com/images/art-160.jpg', meta: { width: 160 } },
+                ],
+              },
+            },
+          ],
+        });
+      }),
+    );
+
+    const result = await bg.handleSearch('windowlicker');
+    const tracks = extractTracks(result);
+
+    expect(tracksUrl).toContain('/tracks');
+    expect(tracksUrl).toContain('countryCode=US');
+    expect(tracksUrl).toContain('include=artists');
+    expect(tracksUrl).toContain('include=albums');
+    expect(tracksUrl).toContain('filter[id]=track-1');
+    expect(albumsUrl).toContain('/albums');
+    expect(albumsUrl).toContain('include=coverArt');
+    expect(albumsUrl).toContain('filter[id]=album-1');
+    expect(tracks).toEqual([
+      {
+        id: 'track-1',
+        title: 'Windowlicker',
+        artists: [{ id: 'artist-1', name: 'Aphex Twin' }],
+        duration: '6:07',
+        artUrl: 'https://resources.tidal.com/images/art-160.jpg',
+      },
+    ]);
+  });
+
+  it('falls back to search suggestion direct hits using its returned opaque ID', async () => {
+    let directHitsUrl: string | undefined;
+    let rootSearchCalled = false;
+    server.use(
+      http.get(`${TIDAL_API_BASE}/searchResults/:query/relationships/tracks`, () =>
+        new HttpResponse(null, { status: 500 }),
+      ),
+      http.get(`${TIDAL_API_BASE}/searchSuggestions/:query/relationships/directHits`, ({ request }) => {
+        directHitsUrl = request.url;
+        return HttpResponse.json({
+          data: [
+            { id: 'artist-1', type: 'artists' },
+            { id: 'track-2', type: 'tracks' },
+          ],
+          included: [],
+        });
+      }),
+      http.get(`${TIDAL_API_BASE}/searchResults/:query`, () => {
+        rootSearchCalled = true;
+        return HttpResponse.json({ data: { id: 'query', type: 'searchResults' }, included: [] });
+      }),
+    );
+
+    const result = await bg.handleSearch('direct hit');
+
+    expect(directHitsUrl).toContain('/searchSuggestions/opaque-suggestion-id/relationships/directHits');
+    expect(rootSearchCalled).toBe(false);
+    expect((Array.isArray(result.data) ? result.data[0] : result.data)?.relationships?.tracks?.data).toEqual([
+      { id: 'track-2', type: 'tracks' },
+    ]);
   });
 });
 
@@ -295,11 +530,18 @@ describe('handleAddFavorite', () => {
     seedLocalStorage({ favoritedTrackIds: [] });
     await bg.handleAddFavorite('track-1');
 
-    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    let favoritesRequests = 0;
+    server.use(
+      http.get(`${TIDAL_API_BASE}/userCollectionTracks/:collectionId/relationships/items`, () => {
+        favoritesRequests++;
+        return HttpResponse.json({ data: [], links: {} });
+      }),
+    );
+
     const result = await bg.handleGetFavorites();
 
     expect(result.trackIds).toEqual(['track-1']);
-    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(favoritesRequests).toBe(0);
   });
 });
 
@@ -487,7 +729,38 @@ describe('typed Tidal API client wrapper', () => {
       http.get(`${TIDAL_API_BASE}/playlists`, () => new HttpResponse(null, { status: 401 })),
     );
     const result = await bg.handleGetPlaylists();
-    expect(result).toEqual({ error: 'API error 401', status: 401 });
+    expect(result).toEqual(expect.objectContaining({ status: 401 }));
+    expect(result.error).toContain('API error 401');
+  });
+
+  it('includes response diagnostics for API errors', async () => {
+    server.use(
+      http.get(`${TIDAL_API_BASE}/playlists`, () =>
+        HttpResponse.json(
+          { errors: [{ code: 'SERVER_ERROR', detail: 'Search exploded' }] },
+          {
+            status: 500,
+            headers: {
+              'x-cache': 'Error from cloudfront',
+              'x-amz-cf-id': 'cf-test-id',
+              'x-envoy-upstream-service-time': '42',
+            },
+          },
+        ),
+      ),
+    );
+
+    const result = await bg.handleGetPlaylists();
+
+    expect(result.status).toBe(500);
+    expect(result.error).toContain('API error 500');
+    expect(result.error).toContain('cf-id=cf-test-id');
+    expect(result.error).toContain('Search exploded');
+    expect(result.details).toEqual(expect.objectContaining({
+      cache: 'Error from cloudfront',
+      cfId: 'cf-test-id',
+      upstreamMs: '42',
+    }));
   });
 });
 
@@ -573,7 +846,8 @@ describe('typed Tidal API client 429 retry', () => {
       }),
     );
     const result = await bg.handleGetPlaylists();
-    expect(result).toEqual({ error: 'API error 401', status: 401 });
+    expect(result).toEqual(expect.objectContaining({ status: 401 }));
+    expect(result.error).toContain('API error 401');
     expect(calls).toBe(1);
   });
 });

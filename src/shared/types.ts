@@ -25,11 +25,17 @@ export interface TidalJsonApiResource {
   id: string;
   type: string;
   attributes?: Record<string, unknown>;
-  relationships?: Record<string, { data: Array<{ id: string; type: string }> } | undefined>;
+  relationships?: Record<string, { data?: Array<{ id: string; type: string }>; links?: unknown } | undefined>;
 }
-export interface SearchResponse { error?: string; data?: TidalJsonApiResource[]; included?: TidalJsonApiResource[] }
+export interface SearchResponse { error?: string; data?: TidalJsonApiResource | TidalJsonApiResource[]; included?: TidalJsonApiResource[] }
 export interface PlaylistsResponse { error?: string; data?: TidalJsonApiResource[] }
-export interface MutationResponse { ok?: true; error?: string; status?: number }
+export interface MutationResponse {
+  ok?: true;
+  error?: string;
+  status?: number;
+  url?: string;
+  details?: Record<string, unknown>;
+}
 export interface FavoritesResponse { error?: string; trackIds?: string[] }
 // Chrome storage
 export interface LocalStorage {

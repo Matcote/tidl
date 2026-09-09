@@ -42,7 +42,7 @@ Injected into every webpage. Responsibilities:
 Handles all privileged operations:
 - **OAuth 2.0 + PKCE**: Full authentication flow using `chrome.identity`
 - **Token lifecycle**: `getValidToken()` auto-refreshes tokens expiring within 60 seconds
-- **Tidal API**: All fetch calls go through `tidalFetch()` which injects the Bearer token
+- **Tidal API**: All calls go through the typed `@tidal-music/api` client wrapper, which injects the Bearer token
 - **Context menu**: Creates "Search in Tidal" right-click menu for selected text
 - **Message routing**: Listens for messages from content script and results popup, dispatches to handler functions
 
@@ -65,8 +65,11 @@ Background stores transient search queries in `chrome.storage.session` key `tidl
 ### Tidal API
 Uses `https://openapi.tidal.com/v2/` (JSON:API format). Full reference: https://tidal-music.github.io/tidal-api-reference/
 
-Key endpoints:
-- `searchResults/{query}` — track search
+- `searchResults?filter[query]=...` — initial search lookup. The returned resource ID is opaque; never use the query text as an ID. Queries must be 1–256 characters.
+- `searchResults/{id}/relationships/tracks` — fetch tracks using the returned search resource ID when the lookup has no inline track identifiers. Do not use `include` here; hydrate via `/tracks` and `/albums`.
+- `searchSuggestions?filter[query]=...` — fallback for search server errors; use its returned resource ID with `searchSuggestions/{id}/relationships/directHits`, retaining only track identifiers.
+- `tracks?filter[id]=...&include=artists,albums` — search result track metadata hydration
+- `albums?filter[id]=...&include=coverArt` — album artwork hydration for hydrated search tracks
 - `playlists?filter[owners.id]=me` — list playlists owned by the authenticated user (returns full resources with `attributes.name`)
 - `userCollections/{userId}/relationships/tracks` — add to favorites
 - `playlists/{playlistId}/relationships/items` — add to playlist

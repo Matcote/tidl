@@ -27,9 +27,9 @@
     "vitest": "^4.1.0"
   },
   "dependencies": {
-    "@tidal-music/api": "^0.22.0",
-    "@tidal-music/auth": "^1.6.0",
-    "@tidal-music/common": "^0.2.0",
-    "@tidal-music/player": "^0.17.0"
+    "@tidal-music/api": "^0.44.0",
+    "@tidal-music/auth": "^1.6.1",
+    "@tidal-music/common": "^0.2.1",
+    "@tidal-music/player": "^0.18.3"
   }
 }

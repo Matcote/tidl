@@ -2,7 +2,7 @@
 // Handles: context menu, OAuth token management, Tidal API calls
 
 import { createAPIClient } from '@tidal-music/api';
-import type { components } from '@tidal-music/api';
+import type { components, RetryOptions } from '@tidal-music/api';
 import { TIDAL_API_BASE } from './shared/constants';
 import { initAuth, credentialsProvider } from './shared/auth';
 import type {
@@ -20,15 +20,25 @@ type TidalApiResult<T> = {
   error?: unknown;
   response: Response;
 };
-type SearchDocument = components['schemas']['SearchResults_Single_Resource_Data_Document'];
+type SearchDocument = components['schemas']['SearchResults_Multi_Resource_Data_Document'];
+type SearchRelationshipDocument = components['schemas']['SearchResults_Multi_Relationship_Data_Document'];
+type SearchSuggestionsRelationshipDocument =
+  components['schemas']['SearchSuggestions_Multi_Relationship_Data_Document'];
+type TracksDocument = components['schemas']['Tracks_Multi_Resource_Data_Document'];
+type AlbumsDocument = components['schemas']['Albums_Multi_Resource_Data_Document'];
 type PlaylistsDocument = components['schemas']['Playlists_Multi_Resource_Data_Document'];
 type PaginatedPlaylistsDocument = PlaylistsDocument & { links?: { next?: string } };
 type RelationshipItemsDocument =
   components['schemas']['UserCollectionTracks_Items_Multi_Relationship_Data_Document'];
 
 let apiClient: TidalApiClient | null = null;
-const MAX_QUERY_LENGTH = 512;
+const MAX_QUERY_LENGTH = 256;
 const TIDAL_ID_RE = /^[A-Za-z0-9_-]{1,128}$/;
+const TRACK_HYDRATION_INCLUDE = ['artists', 'albums'];
+const ALBUM_ART_INCLUDE = ['coverArt'];
+const API_CLIENT_RETRY_OPTIONS: RetryOptions = {
+  status: { maxRetries: 0 },
+};
 
 type MessageValidation =
   | { ok: true; message: ExtensionMessage }
@@ -190,18 +200,128 @@ export async function handleSearch(query: string): Promise<SearchResponse> {
 
   const stored = await chrome.storage.local.get('countryCode') as { countryCode?: string };
   const countryCode = stored.countryCode ?? 'CA';
-  const result = await tidalApiRequest<SearchDocument>(() =>
-    getApiClient().GET('/searchResults/{id}', {
+
+  // Search text is a filter, not a resource ID. TIDAL returns an opaque ID
+  // that must be used unchanged when traversing the tracks relationship.
+  const searchResult = await tidalApiRequest<SearchDocument>(() =>
+    getApiClient().GET('/searchResults', {
+      params: { query: { countryCode, 'filter[query]': normalizedQuery } },
+      // The SDK allows reserved characters by default; search text must be escaped.
+      querySerializer: { allowReserved: false },
+    }),
+  );
+  let searchError: MutationResponse;
+  if (!isMutationResponse(searchResult)) {
+    const resource = searchResult.data?.[0];
+    if (!resource) return { data: [], included: [] };
+    if (resource.relationships?.tracks?.data) {
+      return hydrateSearchTracks(searchResult as SearchResponse, countryCode);
+    }
+    if (!resource.id) return { error: 'Search response is missing its resource ID' };
+    const tracks = await tidalApiRequest<SearchRelationshipDocument>(() =>
+      getApiClient().GET('/searchResults/{id}/relationships/tracks', {
+        params: { path: { id: resource.id }, query: { countryCode } },
+      }),
+    );
+    if (!isMutationResponse(tracks)) {
+      return hydrateSearchTracks(
+        createSearchResponseFromTrackRelationship(resource.id, tracks), countryCode,
+      );
+    }
+    searchError = tracks;
+  } else {
+    searchError = searchResult;
+  }
+
+  // Retrying authorization/validation/rate-limit failures via another search
+  // endpoint cannot fix them and would unnecessarily multiply requests.
+  if (!searchError.status || searchError.status < 500) return searchError;
+  console.warn('[tidl] Search failed, trying search suggestions:', searchError);
+  const suggestions = await tidalApiRequest<components['schemas']['SearchSuggestions_Multi_Resource_Data_Document']>(() =>
+    getApiClient().GET('/searchSuggestions', {
+      params: { query: { countryCode, 'filter[query]': normalizedQuery } },
+      // The SDK allows reserved characters by default; search text must be escaped.
+      querySerializer: { allowReserved: false },
+    }),
+  );
+  if (isMutationResponse(suggestions)) return suggestions;
+  const suggestion = suggestions.data?.[0];
+  if (!suggestion) return { data: [], included: [] };
+  if (!suggestion.id) return { error: 'Search suggestions response is missing its resource ID' };
+  const directHits = suggestion.relationships?.directHits?.data
+    ? { data: suggestion.relationships.directHits.data, ...(suggestions.included ? { included: suggestions.included } : {}) }
+    : await tidalApiRequest<SearchSuggestionsRelationshipDocument>(() =>
+      getApiClient().GET('/searchSuggestions/{id}/relationships/directHits', {
+        params: { path: { id: suggestion.id }, query: { countryCode } },
+      }),
+    );
+  if (isMutationResponse(directHits)) return directHits;
+  return hydrateSearchTracks(
+    createSearchResponseFromTrackRelationship(suggestion.id, directHits), countryCode,
+  );
+}
+
+async function hydrateSearchTracks(
+  searchDocument: SearchResponse,
+  countryCode: string,
+): Promise<SearchResponse> {
+  const trackIds = getSearchTrackIds(searchDocument);
+  if (!trackIds.length) return searchDocument;
+
+  const tracksResult = await tidalApiRequest<TracksDocument>(() =>
+    getApiClient().GET('/tracks', {
       params: {
-        path: { id: normalizedQuery },
         query: {
           countryCode,
-          include: ['tracks', 'tracks.artists', 'tracks.albums', 'tracks.albums.coverArt'],
+          include: TRACK_HYDRATION_INCLUDE,
+          'filter[id]': trackIds,
         },
       },
     }),
   );
-  return result as SearchResponse;
+  if (isMutationResponse(tracksResult)) {
+    console.warn('[tidl] Track hydration failed:', tracksResult.error);
+    return searchDocument;
+  }
+
+  const albumIds = getRelatedIds(tracksResult.data, 'albums');
+  if (!albumIds.length) {
+    return {
+      ...searchDocument,
+      included: mergeResources(searchDocument.included, tracksResult.data, tracksResult.included),
+    };
+  }
+
+  const albumsResult = await tidalApiRequest<AlbumsDocument>(() =>
+    getApiClient().GET('/albums', {
+      params: {
+        query: {
+          countryCode,
+          include: ALBUM_ART_INCLUDE,
+          'filter[id]': albumIds,
+        },
+      },
+    }),
+  );
+
+  if (isMutationResponse(albumsResult)) {
+    console.warn('[tidl] Album artwork hydration failed:', albumsResult.error);
+    return {
+      ...searchDocument,
+      included: mergeResources(searchDocument.included, tracksResult.data, tracksResult.included),
+    };
+  }
+
+  return {
+    ...searchDocument,
+    included: mergeResources(
+      searchDocument.included,
+      tracksResult.data,
+      tracksResult.included,
+      albumsResult.data,
+      albumsResult.included,
+    ),
+  };
 }
 
 const PLAYLISTS_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
@@ -316,13 +436,10 @@ export async function handleAddToPlaylist(trackId: string, playlistId: string): 
   if (!isValidTidalId(trackId)) return { error: 'Invalid track id' };
   if (!isValidTidalId(playlistId)) return { error: 'Invalid playlist id' };
 
-  const stored = await chrome.storage.local.get('countryCode') as { countryCode?: string };
-  const countryCode = stored.countryCode ?? 'CA';
   let result = await tidalApiMutation(() =>
     getApiClient().POST('/playlists/{id}/relationships/items', {
       params: {
         path: { id: playlistId },
-        query: { countryCode },
       },
       body: { data: [{ id: String(trackId), type: 'tracks' }] },
     }),
@@ -410,7 +527,7 @@ export async function handleGetFavorites(forceRefresh = false): Promise<Favorite
 function getApiClient(): TidalApiClient {
   if (apiClient) return apiClient;
 
-  apiClient = createAPIClient(credentialsProvider);
+  apiClient = createAPIClient(credentialsProvider, undefined, API_CLIENT_RETRY_OPTIONS);
   apiClient.use({
     onRequest({ request }) {
       request.headers.set('Accept', 'application/vnd.api+json');
@@ -445,13 +562,36 @@ async function tidalApiRequest<T>(
     }
 
     if (!response.ok) {
-      return { error: `API error ${response.status}`, status: response.status };
+      return createApiError(response, result.error);
     }
 
     return result.data ?? { ok: true };
   }
 
   return { error: 'API error 429', status: 429 };
+}
+
+function createApiError(response: Response, body: unknown): MutationResponse {
+  const details = {
+    body: summarizeApiErrorBody(body),
+    cfId: response.headers.get('x-amz-cf-id') ?? undefined,
+    cache: response.headers.get('x-cache') ?? undefined,
+    upstreamMs: response.headers.get('x-envoy-upstream-service-time') ?? undefined,
+  };
+  const error = [
+    `API error ${response.status}`,
+    response.url ? `at ${response.url}` : null,
+    details.cache ? `(${details.cache})` : null,
+    details.cfId ? `cf-id=${details.cfId}` : null,
+    details.body ? `body=${details.body}` : null,
+  ].filter(Boolean).join(' ');
+
+  return {
+    error,
+    status: response.status,
+    ...(response.url ? { url: response.url } : {}),
+    details,
+  };
 }
 
 async function tidalApiMutation(
@@ -464,6 +604,70 @@ async function tidalApiMutation(
 
 function isMutationResponse(value: unknown): value is MutationResponse {
   return typeof value === 'object' && value !== null && 'error' in value;
+}
+
+function summarizeApiErrorBody(body: unknown): string | undefined {
+  if (body === undefined || body === null || body === '') return undefined;
+  const text = typeof body === 'string' ? body : JSON.stringify(body);
+  return text.length > 500 ? `${text.slice(0, 497)}...` : text;
+}
+
+function createSearchResponseFromTrackRelationship(
+  query: string,
+  relationshipDocument: Pick<SearchRelationshipDocument, 'data' | 'included'>,
+): SearchResponse {
+  const trackData = (relationshipDocument.data ?? []).filter(item => item.type === 'tracks');
+  const response: SearchResponse = {
+    data: {
+      id: query,
+      type: 'searchResults',
+      relationships: {
+        tracks: {
+          data: trackData,
+        },
+      },
+    },
+  };
+  if (relationshipDocument.included) {
+    response.included = relationshipDocument.included as TidalJsonApiResource[];
+  }
+  return response;
+}
+
+function getSearchTrackIds(document: SearchResponse): string[] {
+  const searchResult = Array.isArray(document.data) ? document.data[0] : document.data;
+  const ids = searchResult?.relationships?.tracks?.data?.map(track => track.id) ?? [];
+  return uniqueStrings(ids);
+}
+
+function getRelatedIds(resources: unknown[] | undefined, relationship: string): string[] {
+  const ids: string[] = [];
+  for (const resource of resources ?? []) {
+    if (!isJsonApiResource(resource)) continue;
+    const related = resource.relationships?.[relationship]?.data;
+    if (!Array.isArray(related)) continue;
+    ids.push(...related.map(item => item.id));
+  }
+  return uniqueStrings(ids);
+}
+
+function mergeResources(...groups: Array<unknown[] | undefined>): TidalJsonApiResource[] {
+  const merged = new Map<string, TidalJsonApiResource>();
+  for (const group of groups) {
+    for (const resource of group ?? []) {
+      if (!isJsonApiResource(resource)) continue;
+      merged.set(`${resource.type}:${resource.id}`, resource);
+    }
+  }
+  return Array.from(merged.values());
+}
+
+function isJsonApiResource(value: unknown): value is TidalJsonApiResource {
+  return isPlainObject(value) && typeof value['id'] === 'string' && typeof value['type'] === 'string';
+}
+
+function uniqueStrings(values: string[]): string[] {
+  return Array.from(new Set(values));
 }
 
 function extractRelationshipIds(document: RelationshipItemsDocument): string[] {

@@ -9,7 +9,22 @@ export const handlers = [
       token_type: 'Bearer',
     }),
   ),
-  http.get(`${TIDAL_API_BASE}/searchResults/:query`, () =>
+  http.get(`${TIDAL_API_BASE}/searchResults`, () =>
+    HttpResponse.json({ data: [{ id: 'opaque-search-id', type: 'searchResults' }] }),
+  ),
+  http.get(`${TIDAL_API_BASE}/searchResults/:query/relationships/tracks`, () =>
+    HttpResponse.json({ data: [], included: [] }),
+  ),
+  http.get(`${TIDAL_API_BASE}/searchSuggestions`, () =>
+    HttpResponse.json({ data: [{ id: 'opaque-suggestion-id', type: 'searchSuggestions' }] }),
+  ),
+  http.get(`${TIDAL_API_BASE}/searchSuggestions/:query/relationships/directHits`, () =>
+    HttpResponse.json({ data: [], included: [] }),
+  ),
+  http.get(`${TIDAL_API_BASE}/tracks`, () =>
+    HttpResponse.json({ data: [], included: [] }),
+  ),
+  http.get(`${TIDAL_API_BASE}/albums`, () =>
     HttpResponse.json({ data: [], included: [] }),
   ),
   http.get(`${TIDAL_API_BASE}/playlists`, () =>

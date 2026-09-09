@@ -103,6 +103,22 @@ Do not publish an old zip from `releases/`. Run `npm run package` from a clean t
 
 If a client secret has ever been built into `dist/` or a release zip, rotate or recreate that TIDAL app credential before submitting a public release.
 
+## Search API contract
+
+Search uses `GET /searchResults?filter[query]=...` and follows the returned opaque
+resource ID to `/searchResults/{id}/relationships/tracks` when track identifiers
+are not already present. Query text must never be substituted for a resource ID:
+TIDAL rejects that with `400 INVALID_RESOURCE_ID`. Queries are limited to 256
+characters. Server errors can fall back to `/searchSuggestions?filter[query]=...`
+and its returned ID's `directHits` relationship; authorization and validation
+errors are returned immediately. Track metadata and artwork are hydrated through
+`/tracks` and `/albums`.
+
+The API SDK types and regression tests follow the
+[current TIDAL API reference](https://tidal-music.github.io/tidal-api-reference/).
+After updating, rebuild and reload the unpacked extension in Chrome to replace
+the background worker.
+
 ## License
 
 MIT
